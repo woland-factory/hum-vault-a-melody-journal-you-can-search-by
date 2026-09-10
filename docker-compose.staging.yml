@@ -1,0 +1,31 @@
+name: hum-vault-a-melody-journal-you-can-search-by-staging
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hum-vault-a-melody-journal-you-can-search-by-staging-web
+    expose:
+      - "80"
+    environment:
+      # Client-side identifiers, injected into env.js at start. Blank disables
+      # each integration. The factory mints any values it grants.
+      SENTRY_DSN: "${SENTRY_DSN:-}"
+      UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
+      UMAMI_URL: "${UMAMI_URL:-}"
+    networks:
+      - default
+      - staging
+    mem_limit: 512m
+    oom_score_adj: 800
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost/healthz >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  staging:
+    external: true
+    name: factory-staging-net

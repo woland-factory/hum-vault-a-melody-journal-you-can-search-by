@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.gitignore
+coverage
+playwright-report
+test-results
+*.log
+.env
+.env.*
+!.env.example
+.claude
+result.json
+compose.critique.yml
