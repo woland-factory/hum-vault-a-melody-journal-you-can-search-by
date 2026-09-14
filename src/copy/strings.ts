@@ -63,6 +63,34 @@ export const strings = {
     play: "Play",
   },
 
+  search: {
+    fromSongbook: "Hum to search", // the songbook control and the search heading
+    heading: "Find a tune by humming",
+    intro: "Hum a few notes you remember. Your closest saved ideas come back.",
+    resultsHeading: "Closest matches",
+    again: "Hum again",
+    noMatch: {
+      title: "Try a longer hum",
+      body: "Hum a few more notes, or hum the part you remember best.",
+      action: "Hum again",
+    },
+    noNotes: {
+      title: "Let's try that again",
+      body: "Hum one clear note at a time and hold each a beat longer, then hum again.",
+      action: "Hum again",
+    },
+    emptyCorpus: {
+      title: "Save an idea first",
+      body: "Search looks through your saved hums. Record and save one to begin.",
+      action: "Record a hum",
+    },
+    error: {
+      title: "Hum that again",
+      body: "Check your microphone and hum again.",
+      action: "Hum again",
+    },
+  },
+
   save: {
     action: "Save to songbook",
     saving: "Saving",

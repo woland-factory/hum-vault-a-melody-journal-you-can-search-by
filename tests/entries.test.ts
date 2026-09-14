@@ -3,6 +3,7 @@ import {
   saveEntry,
   getEntry,
   listEntries,
+  listContours,
   updateEntry,
   deleteEntry,
   countEntries,
@@ -97,6 +98,30 @@ describe("listEntries", () => {
     const { entries, nextBefore } = await listEntries();
     expect(entries).toEqual([]);
     expect(nextBefore).toBeNull();
+  });
+});
+
+describe("listContours", () => {
+  it("returns id, title, and contour for every entry, newest first, without the audio blob", async () => {
+    let clock = 2_000;
+    vi.spyOn(Date, "now").mockImplementation(() => (clock += 1));
+    await saveEntry(makeInput({ title: "First" }));
+    await saveEntry(makeInput({ title: "Second" }));
+
+    const candidates = await listContours();
+    expect(candidates.map((c) => c.title)).toEqual(["Second", "First"]);
+    for (const c of candidates) {
+      expect(typeof c.id).toBe("string");
+      expect(c.contour).toEqual(computeContour(notes));
+      // No audio blob, no notes on a search candidate.
+      const raw = c as unknown as Record<string, unknown>;
+      expect(raw.audio).toBeUndefined();
+      expect(raw.notes).toBeUndefined();
+    }
+  });
+
+  it("returns an empty list with no entries", async () => {
+    expect(await listContours()).toEqual([]);
   });
 });
 

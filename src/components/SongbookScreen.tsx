@@ -22,6 +22,9 @@ export default function SongbookScreen() {
 
   const playResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // The search control appears only when there is something to search.
+  const hasEntries = state === "loaded" && entries.length > 0;
+
   const loadFirstPage = useCallback(async () => {
     setState("loading");
     try {
@@ -86,13 +89,35 @@ export default function SongbookScreen() {
       <header className="screen__header">
         <div className="screen__topbar">
           <h1 className="screen__title">{strings.nav.songbook}</h1>
-          <button
-            type="button"
-            className="btn btn--primary"
-            onClick={() => navigate("/")}
-          >
-            {strings.nav.recordFromSongbook}
-          </button>
+          {hasEntries ? (
+            // On a populated songbook, humming to search is the differentiator,
+            // so it is the primary action; recording stays available but
+            // subordinate.
+            <div className="songbook__actions">
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={() => navigate("/search")}
+              >
+                {strings.search.fromSongbook}
+              </button>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                onClick={() => navigate("/")}
+              >
+                {strings.nav.recordFromSongbook}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--primary"
+              onClick={() => navigate("/")}
+            >
+              {strings.nav.recordFromSongbook}
+            </button>
+          )}
         </div>
       </header>
 

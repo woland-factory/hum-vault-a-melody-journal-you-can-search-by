@@ -41,6 +41,7 @@ function entry(over: Partial<Entry>): Entry {
 beforeEach(() => {
   vi.mocked(listEntries).mockReset();
   play.mockClear();
+  window.location.hash = "";
 });
 
 describe("SongbookScreen", () => {
@@ -82,6 +83,35 @@ describe("SongbookScreen", () => {
     const row = (await screen.findByText("Tune")).closest("li")!;
     await user.click(within(row).getByRole("button", { name: strings.nav.play }));
     expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the Hum to search action as primary when entries exist and navigates to search", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listEntries).mockResolvedValue({
+      entries: [entry({ id: "a", title: "Tune" })],
+      nextBefore: null,
+    });
+    render(<SongbookScreen />);
+
+    const search = await screen.findByRole("button", {
+      name: strings.search.fromSongbook,
+    });
+    expect(search).toHaveClass("btn--primary");
+    // Record stays available but subordinate.
+    const record = screen.getByRole("button", { name: strings.nav.recordFromSongbook });
+    expect(record).not.toHaveClass("btn--primary");
+
+    await user.click(search);
+    expect(window.location.hash).toBe("#/search");
+  });
+
+  it("shows no search action on an empty songbook", async () => {
+    vi.mocked(listEntries).mockResolvedValue({ entries: [], nextBefore: null });
+    render(<SongbookScreen />);
+    await screen.findByText(strings.songbookEmpty.title);
+    expect(
+      screen.queryByRole("button", { name: strings.search.fromSongbook }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows a load error state with a reload action when the query rejects", async () => {

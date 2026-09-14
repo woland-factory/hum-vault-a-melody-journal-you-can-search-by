@@ -26,6 +26,15 @@ export interface MelodyContour {
   ioiRatios: number[]; // consecutive inter-onset-interval ratios; length = max(0, n-2)
 }
 
+// A corpus row reduced to what matching needs: no audio blob, no notes. It is
+// storage-shaped, so it lives beside Entry; both entries.ts and the matcher
+// import it without coupling to each other.
+export interface SearchCandidate {
+  id: string;
+  title: string;
+  contour: MelodyContour;
+}
+
 export interface Entry {
   id: string; // crypto.randomUUID()
   title: string;

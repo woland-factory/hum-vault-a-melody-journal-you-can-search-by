@@ -359,6 +359,35 @@ body {
   align-self: center;
 }
 
+/* Songbook top-bar actions: search primary, record subordinate */
+.songbook__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Search screen */
+.search__prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.search__prompt .screen__tagline {
+  margin: 0;
+}
+
+.search__results-heading {
+  margin-bottom: 4px;
+}
+
+.search__again {
+  align-self: center;
+}
+
 /* Entry list */
 .entry-list {
   list-style: none;

@@ -22,10 +22,12 @@ describe("useHashRoute", () => {
     expect(result.current).toEqual({ name: "capture" });
   });
 
-  it("maps #/songbook and #/entry/:id", () => {
+  it("maps #/songbook, #/search, and #/entry/:id", () => {
     const { result } = renderHook(() => useHashRoute());
     go("/songbook");
     expect(result.current).toEqual({ name: "songbook" });
+    go("/search");
+    expect(result.current).toEqual({ name: "search" });
     go("/entry/abc-123");
     expect(result.current).toEqual({ name: "entry", id: "abc-123" });
   });

@@ -7,6 +7,7 @@ import {
   ENTRY_SCHEMA_VERSION,
   ENTRY_STORE,
   type Entry,
+  type SearchCandidate,
 } from "./schema";
 
 // A thin, typed, promise-based wrapper over the native IndexedDB API. The
@@ -14,6 +15,11 @@ import {
 // through the byCreatedAt index so no query scans the whole store unsorted.
 
 const DEFAULT_PAGE_SIZE = 30;
+
+// Safety backstop for the one deliberately unbounded read (listContours). Far
+// above any realistic hand-hummed corpus; a later EPIC can revisit if real
+// vaults approach it.
+const MAX_SEARCH_CORPUS = 2000;
 
 // Boundary validation limits (QUALITY BAR §5). Everything is local, but input
 // is still validated at this boundary.
@@ -267,6 +273,41 @@ export function deleteEntry(id: string): Promise<void> {
     const { store, done } = tx(db, "readwrite");
     store.delete(id);
     return done;
+  });
+}
+
+// Cursor the whole entries store (newest first via the byCreatedAt index) and
+// return only { id, title, contour } per entry: no audio blob, no notes, so
+// scanning the corpus for a melodic match is cheap. This is the app's one
+// deliberately unbounded read, and it is correct by design: search must see
+// every entry or it would silently fail to recall old ideas. Each row is tiny
+// (a few number arrays), so match cost is O(sum of contour lengths). Stops
+// after MAX_SEARCH_CORPUS rows and logs a count only (never titles, notes, or
+// contours) if the store is larger.
+export function listContours(): Promise<SearchCandidate[]> {
+  return openDb().then((db) => {
+    const { store, done } = tx(db, "readonly");
+    const index = store.index(CREATED_AT_INDEX);
+    const cursorReq = index.openCursor(undefined, "prev");
+    const candidates: SearchCandidate[] = [];
+
+    return new Promise<SearchCandidate[]>((resolve, reject) => {
+      cursorReq.onsuccess = () => {
+        const cursor = cursorReq.result;
+        if (cursor && candidates.length < MAX_SEARCH_CORPUS) {
+          const entry = cursor.value as Entry;
+          candidates.push({ id: entry.id, title: entry.title, contour: entry.contour });
+          cursor.continue();
+          return;
+        }
+        if (cursor) {
+          // The store is larger than the backstop; report the count only.
+          console.info(`Search scanned ${candidates.length} entries (corpus is larger).`);
+        }
+        done.then(() => resolve(candidates)).catch(reject);
+      };
+      cursorReq.onerror = () => reject(wrapError(cursorReq.error));
+    });
   });
 }
 
