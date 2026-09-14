@@ -3,8 +3,8 @@
 Hum a tune into your browser and watch it turn into draft sheet music you can
 play back. Everything runs on your device: the microphone audio is transcribed
 locally and never uploaded. Save each hum to a private songbook that grows into
-a collection of your melodic ideas. A later release will let you find any old
-idea by humming the few notes you still remember.
+a collection of your melodic ideas, then find any old idea by humming the few
+notes you still remember.
 
 ## How it works
 
@@ -35,12 +35,25 @@ collection grows.
 Each saved entry also stores a **contour**: the melody's shape as a list of
 note-to-note intervals and rhythm ratios. Intervals make the shape independent
 of key and octave, and ratios make it independent of tempo. That contour is the
-index a future release will match a hummed fragment against.
+index search matches a hummed fragment against.
 
 The contour is derived from the transcribed notes, not from the draft notation.
 Editing an entry's notation by hand changes only how it looks and plays back. It
 does not change the notes or the contour, so hand edits never skew the search
 index.
+
+### Find a tune by humming
+
+From a songbook with saved ideas, tap **Hum to search** and hum the part of an
+old tune you still remember. Hum Vault transcribes the fragment on-device,
+computes its contour, and ranks your saved ideas by melodic distance, closest
+first. The match works on melodic shape, so it finds the idea even when you hum
+in a different key or octave, faster or slower, or miss a note. Play any result
+in place or open its full entry.
+
+The search runs entirely in the browser over your own saved ideas. There is no
+server and no music catalog: it only ever finds tunes you have saved, and the
+query hum is matched in memory and never saved.
 
 ## Run it locally
 
@@ -88,13 +101,13 @@ it serves, generates `env.js`, and keeps runtime values out of the bundle.
 
 ```
 src/
-  components/   Capture, songbook, entry detail, and shared UI surfaces
+  components/   Capture, songbook, search, entry detail, and shared UI surfaces
   audio/        Microphone capture, decode and resample to mono 22050 Hz
   transcribe/   basic-pitch model loading and monophonic note extraction
   notation/     Deterministic NoteEvent[] -> draft ABC, and ABC -> playable tune
-  melody/       Pure contour (search index) and playback-length helpers
+  melody/       Pure contour (search index), the melodic matcher, and helpers
   db/           IndexedDB schema and the typed Entry CRUD layer
-  router/       Tiny hash router for the three views
+  router/       Tiny hash router for the capture, songbook, search, and entry views
   playback/     abcjs synth wrapper, self-hosted soundfont, shared player
   util/         Small helpers (date formatting)
   config/       Runtime env read from window.__HUMVAULT_ENV__
