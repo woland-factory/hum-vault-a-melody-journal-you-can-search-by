@@ -10,6 +10,7 @@ vi.mock("abcjs", () => ({
 
 vi.mock("../src/audio/decode", () => ({
   decodeToMono22050: vi.fn().mockResolvedValue(new Float32Array(8)),
+  TARGET_SAMPLE_RATE: 22_050,
 }));
 
 vi.mock("../src/transcribe/basicPitch", () => ({
@@ -17,13 +18,18 @@ vi.mock("../src/transcribe/basicPitch", () => ({
   transcribe: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../src/playback/player", () => ({
-  createPlayer: () => ({
+vi.mock("../src/playback/player", () => {
+  const player = {
     play: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn(),
     dispose: vi.fn(),
-  }),
-}));
+  };
+  return {
+    createPlayer: () => player,
+    getSharedPlayer: () => player,
+    disposeSharedPlayer: vi.fn(),
+  };
+});
 
 vi.mock("../src/audio/recorder", () => {
   class RecorderError extends Error {

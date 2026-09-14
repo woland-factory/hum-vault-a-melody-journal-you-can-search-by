@@ -76,3 +76,17 @@ export function createPlayer(): MelodyPlayer {
     },
   };
 }
+
+// Capture, songbook rows, and entry detail all play through one instance, so
+// starting one melody stops whatever was already playing.
+let sharedPlayer: MelodyPlayer | null = null;
+
+export function getSharedPlayer(): MelodyPlayer {
+  if (!sharedPlayer) sharedPlayer = createPlayer();
+  return sharedPlayer;
+}
+
+export function disposeSharedPlayer(): void {
+  sharedPlayer?.dispose();
+  sharedPlayer = null;
+}

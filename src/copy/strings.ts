@@ -55,6 +55,66 @@ export const strings = {
     body: "Tap play to start it again.",
     action: "Play",
   },
+
+  nav: {
+    songbook: "Songbook",
+    recordFromSongbook: "Record a hum",
+    showMore: "Show more",
+    play: "Play",
+  },
+
+  save: {
+    action: "Save to songbook",
+    saving: "Saving",
+    saved: "Saved",
+    viewInSongbook: "View in songbook",
+    // Default entry title, joined with a short date, e.g. "Hum, Sep 11".
+    titlePrefix: "Hum,",
+  },
+
+  saveError: {
+    title: "Try saving again",
+    body: "The save could not finish. Try once more.",
+    action: "Try again",
+  },
+
+  songbookEmpty: {
+    title: "Start your songbook",
+    body: "Every hum you save lands here, ready to play back. Record your first idea to begin.",
+    action: "Record a hum",
+  },
+
+  songbookError: {
+    title: "Reload to open your songbook",
+    body: "The songbook could not open just now. Reload the page to try again.",
+    action: "Reload",
+  },
+
+  detail: {
+    titleLabel: "Title",
+    tagsLabel: "Tags",
+    addTagPlaceholder: "Add a tag",
+    addTagAction: "Add",
+    removeTagPrefix: "Remove tag",
+    notationHeading: "Draft notation",
+    editNotation: "Edit notation",
+    saveNotation: "Save",
+    notationLabel: "Notation",
+    delete: "Delete",
+  },
+
+  entryNotFound: {
+    title: "Back to the songbook",
+    body: "This idea is not in your songbook. It may have been removed.",
+    action: "Songbook",
+  },
+
+  deleteConfirm: {
+    title: "Delete this idea?",
+    body: "This removes the recording and its notation from this device. This cannot be undone.",
+    confirm: "Delete",
+    cancel: "Keep",
+  },
 } as const;
 
 export type Strings = typeof strings;

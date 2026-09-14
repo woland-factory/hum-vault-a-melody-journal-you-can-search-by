@@ -8,7 +8,10 @@ interface NotationViewProps {
   playing: boolean;
   onRendered: (visualObj: VisualObj) => void;
   onPlay: () => void;
-  onStartOver: () => void;
+  onStartOver?: () => void;
+  // When another control is the screen's primary action (Save on capture),
+  // Play steps down to a secondary style so only one action leads.
+  playPrimary?: boolean;
 }
 
 // Renders the draft ABC with abcjs and hosts the Play and Record another
@@ -19,6 +22,7 @@ export default function NotationView({
   onRendered,
   onPlay,
   onStartOver,
+  playPrimary = true,
 }: NotationViewProps) {
   const paperRef = useRef<HTMLDivElement>(null);
 
@@ -38,14 +42,18 @@ export default function NotationView({
       <div className="notation__actions">
         <button
           type="button"
-          className={`btn btn--primary${playing ? " btn--active" : ""}`}
+          className={`btn ${playPrimary ? "btn--primary" : "btn--secondary"}${
+            playing ? " btn--active" : ""
+          }`}
           onClick={onPlay}
         >
           {playing ? strings.ready.playing : strings.ready.play}
         </button>
-        <button type="button" className="btn btn--ghost" onClick={onStartOver}>
-          {strings.ready.startOver}
-        </button>
+        {onStartOver && (
+          <button type="button" className="btn btn--ghost" onClick={onStartOver}>
+            {strings.ready.startOver}
+          </button>
+        )}
       </div>
     </section>
   );

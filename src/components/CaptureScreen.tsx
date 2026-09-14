@@ -6,14 +6,27 @@ import {
   MAX_RECORDING_MS,
   type Recording,
 } from "../audio/recorder";
-import { decodeToMono22050 } from "../audio/decode";
+import { decodeToMono22050, TARGET_SAMPLE_RATE } from "../audio/decode";
 import { transcribe, warmUpModel } from "../transcribe/basicPitch";
 import type { NoteEvent } from "../transcribe/types";
 import { notesToAbc } from "../notation/notesToAbc";
-import { createPlayer, type MelodyPlayer, type VisualObj } from "../playback/player";
+import { estimateMelodyMs } from "../melody/duration";
+import { getSharedPlayer, type VisualObj } from "../playback/player";
+import { saveEntry, countEntries } from "../db/entries";
+import { navigate } from "../router/useHashRoute";
 import RecordButton from "./RecordButton";
 import NotationView from "./NotationView";
 import StatusMessage from "./StatusMessage";
+
+type SaveState = "idle" | "saving" | "saved" | "error";
+
+function defaultTitle(): string {
+  const date = new Date().toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+  return `${strings.save.titlePrefix} ${date}`;
+}
 
 type Phase =
   | "idle"
@@ -35,10 +48,15 @@ export default function CaptureScreen() {
   const [modelReady, setModelReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [entryCount, setEntryCount] = useState<number | null>(null);
 
   const recordingRef = useRef<Recording | null>(null);
-  const playerRef = useRef<MelodyPlayer | null>(null);
   const visualObjRef = useRef<VisualObj | null>(null);
+  // Retained from the pipeline so a ready result can be saved as an Entry.
+  const sourceBlobRef = useRef<Blob | null>(null);
+  const notesRef = useRef<NoteEvent[]>([]);
+  const durationSecRef = useRef(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const melodyMsRef = useRef(0);
@@ -54,19 +72,31 @@ export default function CaptureScreen() {
       });
   }, []);
 
+  // Show how many ideas are already saved so the Songbook link is meaningful.
+  // Refreshes whenever we return to the idle screen or finish a save.
+  useEffect(() => {
+    if (phase !== "idle" && saveState !== "saved") return;
+    let active = true;
+    void countEntries()
+      .then((n) => {
+        if (active) setEntryCount(n);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [phase, saveState]);
+
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
       if (playResetRef.current) clearTimeout(playResetRef.current);
       recordingRef.current?.cancel();
-      playerRef.current?.dispose();
+      // The shared player is reused across screens, so stop it rather than
+      // disposing it on unmount.
+      getSharedPlayer().stop();
     };
   }, []);
-
-  const getPlayer = () => {
-    if (!playerRef.current) playerRef.current = createPlayer();
-    return playerRef.current;
-  };
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -95,7 +125,12 @@ export default function CaptureScreen() {
         setPhase("empty-result");
         return;
       }
-      melodyMsRef.current = estimateDurationMs(notes);
+      melodyMsRef.current = estimateMelodyMs(notes);
+      // Retain the source audio and notes so the ready result can be saved.
+      sourceBlobRef.current = blob;
+      notesRef.current = notes;
+      durationSecRef.current = audio.length / TARGET_SAMPLE_RATE;
+      setSaveState("idle");
       setAbc(notesToAbc(notes));
       setPhase("ready");
     } catch {
@@ -168,7 +203,7 @@ export default function CaptureScreen() {
       Math.max(1200, melodyMsRef.current),
     );
     try {
-      await getPlayer().play(visualObjRef.current);
+      await getSharedPlayer().play(visualObjRef.current);
     } catch {
       setPlaying(false);
       if (playResetRef.current) clearTimeout(playResetRef.current);
@@ -176,12 +211,35 @@ export default function CaptureScreen() {
     }
   }, []);
 
+  const handleSave = useCallback(async () => {
+    const audio = sourceBlobRef.current;
+    if (!audio || !abc) return;
+    setSaveState("saving");
+    try {
+      await saveEntry({
+        audio,
+        audioMimeType: audio.type,
+        durationSec: durationSecRef.current,
+        notes: notesRef.current,
+        notationAbc: abc,
+        title: defaultTitle(),
+        tags: [],
+      });
+      setSaveState("saved");
+    } catch {
+      setSaveState("error");
+    }
+  }, [abc]);
+
   const handleStartOver = useCallback(() => {
-    getPlayer().stop();
+    getSharedPlayer().stop();
     setPlaying(false);
     setPlaybackError(false);
     setAbc(null);
+    setSaveState("idle");
     visualObjRef.current = null;
+    sourceBlobRef.current = null;
+    notesRef.current = [];
     setPhase("idle");
   }, []);
 
@@ -220,6 +278,15 @@ export default function CaptureScreen() {
                 {strings.record.tryExample}
               </button>
             )}
+            {phase === "idle" && entryCount !== null && entryCount > 0 && (
+              <button
+                type="button"
+                className="link screen__songbook-link"
+                onClick={() => navigate("/songbook")}
+              >
+                {strings.nav.songbook} ({entryCount})
+              </button>
+            )}
           </>
         )}
 
@@ -237,7 +304,41 @@ export default function CaptureScreen() {
               onRendered={onRendered}
               onPlay={() => void handlePlay()}
               onStartOver={handleStartOver}
+              playPrimary={false}
             />
+
+            {saveState === "error" ? (
+              <StatusMessage
+                tone="error"
+                title={strings.saveError.title}
+                body={strings.saveError.body}
+                actionLabel={strings.saveError.action}
+                onAction={() => void handleSave()}
+              />
+            ) : saveState === "saved" ? (
+              <div className="save save--done">
+                <p className="save__done" role="status">
+                  {strings.save.saved}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => navigate("/songbook")}
+                >
+                  {strings.save.viewInSongbook}
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="btn btn--primary save__action"
+                onClick={() => void handleSave()}
+                disabled={saveState === "saving"}
+              >
+                {saveState === "saving" ? strings.save.saving : strings.save.action}
+              </button>
+            )}
+
             {playbackError && (
               <StatusMessage
                 tone="error"
@@ -300,12 +401,4 @@ function Progress({ label }: { label: string }) {
       <p className="progress__label">{label}</p>
     </div>
   );
-}
-
-function estimateDurationMs(notes: NoteEvent[]): number {
-  const end = notes.reduce(
-    (max, n) => Math.max(max, n.startSec + n.durationSec),
-    0,
-  );
-  return Math.round(end * 1000) + 800;
 }
