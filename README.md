@@ -2,8 +2,9 @@
 
 Hum a tune into your browser and watch it turn into draft sheet music you can
 play back. Everything runs on your device: the microphone audio is transcribed
-locally and never uploaded. This first release is the capture screen, the start
-of a private songbook you will later be able to search by humming.
+locally and never uploaded. Save each hum to a private songbook that grows into
+a collection of your melodic ideas. A later release will let you find any old
+idea by humming the few notes you still remember.
 
 ## How it works
 
@@ -14,6 +15,8 @@ of a private songbook you will later be able to search by humming.
    draft [ABC notation](https://abcnotation.com/) with
    [`abcjs`](https://www.abcjs.net/).
 4. Tap **Play** to hear the draft back.
+5. Tap **Save to songbook** to keep it. Saved ideas live in your browser's
+   IndexedDB, so they survive a reload and a browser restart.
 
 No microphone handy? Tap **Try an example** to run the same pipeline on a
 bundled sample.
@@ -21,6 +24,23 @@ bundled sample.
 The notation is a rough draft of a single melody line, not engraving-grade
 score. Getting the notes right is the point; the rhythm of the draft stays
 rough on purpose.
+
+### Your songbook
+
+Open the **Songbook** to see every saved idea, newest first. Play any entry
+from the list, or open one to rename it, add and remove tags, edit its draft
+notation, or delete it. The list loads a page at a time so it stays fast as the
+collection grows.
+
+Each saved entry also stores a **contour**: the melody's shape as a list of
+note-to-note intervals and rhythm ratios. Intervals make the shape independent
+of key and octave, and ratios make it independent of tempo. That contour is the
+index a future release will match a hummed fragment against.
+
+The contour is derived from the transcribed notes, not from the draft notation.
+Editing an entry's notation by hand changes only how it looks and plays back. It
+does not change the notes or the contour, so hand edits never skew the search
+index.
 
 ## Run it locally
 
@@ -68,11 +88,15 @@ it serves, generates `env.js`, and keeps runtime values out of the bundle.
 
 ```
 src/
-  components/   Capture screen, record button, notation view, status surfaces
+  components/   Capture, songbook, entry detail, and shared UI surfaces
   audio/        Microphone capture, decode and resample to mono 22050 Hz
   transcribe/   basic-pitch model loading and monophonic note extraction
-  notation/     Deterministic NoteEvent[] -> draft ABC conversion
-  playback/     abcjs synth wrapper, self-hosted soundfont
+  notation/     Deterministic NoteEvent[] -> draft ABC, and ABC -> playable tune
+  melody/       Pure contour (search index) and playback-length helpers
+  db/           IndexedDB schema and the typed Entry CRUD layer
+  router/       Tiny hash router for the three views
+  playback/     abcjs synth wrapper, self-hosted soundfont, shared player
+  util/         Small helpers (date formatting)
   config/       Runtime env read from window.__HUMVAULT_ENV__
   telemetry/    Optional Sentry and Umami wiring
   copy/         Every user-visible string in one place
@@ -91,15 +115,22 @@ bash scripts/e2e.sh   # end-to-end test in the pinned Playwright container
 
 `scripts/e2e.sh` runs the suite inside the official Playwright image so the
 browser build matches the pinned `@playwright/test` version. The end-to-end
-test builds the production bundle and drives the capture pipeline in a real
-browser.
+tests build the production bundle and drive the app in a real browser, including
+a save-then-reload proof that a saved entry persists in IndexedDB.
+
+Storage isolation: unit tests run against
+[`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) under jsdom, and
+each Playwright test gets a fresh browser context with its own empty IndexedDB.
+Every run starts from a clean database with no shared state to leak between runs.
 
 ## A note on privacy and security
 
-Hum Vault is client-only. There is no account, no server, and no database: the
-recording is processed in the browser and never leaves the device. Because
+Hum Vault is client-only. There is no account and no server: the recording is
+processed in the browser and never leaves the device. Saved ideas, including the
+original audio, live in the browser's own IndexedDB on your device. Because
 there is no server-side state or API, there are no authenticated routes to
-guard in this release.
+guard in this release. Input is still validated at the storage boundary, and the
+app handles a full storage quota with a clear retry rather than a crash.
 
 ## License
 
