@@ -28,6 +28,8 @@ describe("useHashRoute", () => {
     expect(result.current).toEqual({ name: "songbook" });
     go("/search");
     expect(result.current).toEqual({ name: "search" });
+    go("/settings");
+    expect(result.current).toEqual({ name: "settings" });
     go("/entry/abc-123");
     expect(result.current).toEqual({ name: "entry", id: "abc-123" });
   });

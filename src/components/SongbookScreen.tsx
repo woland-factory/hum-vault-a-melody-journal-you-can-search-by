@@ -119,6 +119,14 @@ export default function SongbookScreen() {
             </button>
           )}
         </div>
+        {/* Quiet link so Export is two taps away: Settings, then Export. */}
+        <button
+          type="button"
+          className="link songbook__settings"
+          onClick={() => navigate("/settings")}
+        >
+          {strings.nav.settings}
+        </button>
       </header>
 
       <div className="screen__body">

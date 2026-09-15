@@ -17,6 +17,7 @@ import { navigate } from "../router/useHashRoute";
 import RecordButton from "./RecordButton";
 import NotationView from "./NotationView";
 import StatusMessage from "./StatusMessage";
+import ImportPanel from "./ImportPanel";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -287,6 +288,8 @@ export default function CaptureScreen() {
                 {strings.nav.songbook} ({entryCount})
               </button>
             )}
+            {/* Subordinate to recording: fill the vault from existing memos. */}
+            {phase === "idle" && <ImportPanel />}
           </>
         )}
 

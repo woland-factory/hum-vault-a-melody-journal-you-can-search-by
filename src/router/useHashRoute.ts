@@ -8,6 +8,7 @@ export type Route =
   | { name: "capture" }
   | { name: "songbook" }
   | { name: "search" }
+  | { name: "settings" }
   | { name: "entry"; id: string };
 
 function parseHash(hash: string): Route {
@@ -16,6 +17,7 @@ function parseHash(hash: string): Route {
   if (path === "" || path === "/") return { name: "capture" };
   if (path === "/songbook") return { name: "songbook" };
   if (path === "/search") return { name: "search" };
+  if (path === "/settings") return { name: "settings" };
   const entryMatch = path.match(/^\/entry\/([^/]+)$/);
   if (entryMatch) return { name: "entry", id: decodeURIComponent(entryMatch[1]) };
   return { name: "capture" };

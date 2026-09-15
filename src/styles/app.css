@@ -624,6 +624,182 @@ body {
   }
 }
 
+/* Visually hidden but focusable/labelable (file inputs behind label buttons) */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Label-as-button file inputs keep a visible focus ring via focus-within */
+.import__choose,
+.settings__import {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.import__choose:focus-within,
+.settings__import:focus-within {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Import panel (capture screen) */
+.import {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.import__heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.import__drop {
+  border: 2px dashed #33415580;
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+.import__drop--over {
+  border-color: var(--accent);
+  background: #f59e0b14;
+}
+
+.import__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.import__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.import__row {
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.import__row-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.import__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.import__status {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.import__status--saved {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.import__message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.import__summary {
+  margin: 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* Songbook settings link */
+.songbook__settings {
+  align-self: flex-start;
+  padding: 4px 4px;
+  min-height: 32px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.songbook__settings:hover {
+  color: var(--text);
+}
+
+/* Settings screen */
+.settings__section {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.settings__heading {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.settings__line {
+  margin: 0;
+}
+
+.settings__line--muted {
+  color: var(--muted);
+}
+
+.settings__done {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.settings__export,
+.settings__import {
+  align-self: stretch;
+}
+
 /* Confirm dialog */
 .dialog-overlay {
   position: fixed;
