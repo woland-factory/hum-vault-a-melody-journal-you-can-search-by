@@ -172,6 +172,58 @@ export function saveEntry(input: {
   });
 }
 
+/**
+ * Restore an entry from a backup, preserving its identity. Validates at the
+ * boundary, then in one readwrite transaction checks whether the id already
+ * exists: if so resolves "skipped" without writing, otherwise puts the entry
+ * preserving id, createdAt, updatedAt, and schemaVersion. This is what makes
+ * repeated import of the same backup idempotent.
+ */
+export function putImportedEntry(entry: Entry): Promise<"imported" | "skipped"> {
+  let clean: Entry;
+  try {
+    if (typeof entry.id !== "string" || entry.id.length === 0 || entry.id.length > 200) {
+      throw new ValidationError("This backup entry has a bad id.");
+    }
+    if (!(entry.audio instanceof Blob)) {
+      throw new ValidationError("This backup entry has no audio.");
+    }
+    if (!Array.isArray(entry.notes)) {
+      throw new ValidationError("This backup entry has no notes.");
+    }
+    clean = {
+      ...entry,
+      title: validateTitle(entry.title),
+      notationAbc: validateNotation(entry.notationAbc),
+      tags: normalizeTags(entry.tags),
+    };
+  } catch (err) {
+    return Promise.reject(err);
+  }
+
+  return openDb().then(
+    (db) =>
+      new Promise<"imported" | "skipped">((resolve, reject) => {
+        const transaction = db.transaction(ENTRY_STORE, "readwrite");
+        const store = transaction.objectStore(ENTRY_STORE);
+        const getReq = store.get(clean.id);
+        let outcome: "imported" | "skipped" = "skipped";
+        getReq.onsuccess = () => {
+          if (getReq.result === undefined) {
+            outcome = "imported";
+            // Issued synchronously in the get callback so the transaction
+            // stays active for the check-then-write.
+            store.put(clean);
+          }
+        };
+        getReq.onerror = () => reject(wrapError(getReq.error));
+        transaction.oncomplete = () => resolve(outcome);
+        transaction.onerror = () => reject(wrapError(transaction.error));
+        transaction.onabort = () => reject(wrapError(transaction.error));
+      }),
+  );
+}
+
 export function getEntry(id: string): Promise<Entry | undefined> {
   return openDb().then((db) => {
     const { store, done } = tx(db, "readonly");

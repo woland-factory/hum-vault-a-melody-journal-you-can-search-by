@@ -7,8 +7,10 @@ import {
   updateEntry,
   deleteEntry,
   countEntries,
+  putImportedEntry,
   ValidationError,
 } from "../src/db/entries";
+import type { Entry } from "../src/db/schema";
 import { computeContour } from "../src/melody/contour";
 import type { NoteEvent } from "../src/transcribe/types";
 
@@ -162,6 +164,62 @@ describe("deleteEntry / countEntries", () => {
     await deleteEntry(a.id);
     expect(await countEntries()).toBe(1);
     expect(await getEntry(a.id)).toBeUndefined();
+  });
+});
+
+describe("putImportedEntry", () => {
+  function importedEntry(overrides: Partial<Entry> = {}): Entry {
+    return {
+      id: "imported-1",
+      title: "Restored idea",
+      createdAt: 1111,
+      updatedAt: 2222,
+      audio: new Blob([new Uint8Array([1, 2])], { type: "audio/webm" }),
+      audioMimeType: "audio/webm",
+      durationSec: 1,
+      notes,
+      contour: computeContour(notes),
+      notationAbc: "X:1\nK:C\nCEG\n",
+      tags: ["old"],
+      schemaVersion: 1,
+      ...overrides,
+    };
+  }
+
+  it("imports a new entry preserving id, createdAt, updatedAt, and schemaVersion", async () => {
+    expect(await putImportedEntry(importedEntry())).toBe("imported");
+    const got = await getEntry("imported-1");
+    expect(got).toBeDefined();
+    expect(got!.createdAt).toBe(1111);
+    expect(got!.updatedAt).toBe(2222);
+    expect(got!.schemaVersion).toBe(1);
+    expect(got!.title).toBe("Restored idea");
+    expect(got!.tags).toEqual(["old"]);
+  });
+
+  it("returns skipped for an existing id without overwriting", async () => {
+    await putImportedEntry(importedEntry());
+    expect(
+      await putImportedEntry(importedEntry({ title: "Sneaky overwrite" })),
+    ).toBe("skipped");
+    expect(await countEntries()).toBe(1);
+    expect((await getEntry("imported-1"))!.title).toBe("Restored idea");
+  });
+
+  it("rejects invalid fields at the boundary", async () => {
+    await expect(
+      putImportedEntry(importedEntry({ title: "x".repeat(121) })),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await expect(
+      putImportedEntry(importedEntry({ id: "" })),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await expect(
+      putImportedEntry(importedEntry({ audio: undefined as unknown as Blob })),
+    ).rejects.toBeInstanceOf(ValidationError);
+    await expect(
+      putImportedEntry(importedEntry({ notes: "nope" as unknown as Entry["notes"] })),
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(await countEntries()).toBe(0);
   });
 });
 
