@@ -61,6 +61,53 @@ export const strings = {
     recordFromSongbook: "Record a hum",
     showMore: "Show more",
     play: "Play",
+    settings: "Settings",
+  },
+
+  import: {
+    heading: "Add from files",
+    hint: "Drop voice memos here, or choose files.",
+    choose: "Choose files",
+    queued: "Waiting",
+    decoding: "Opening",
+    reading: "Reading",
+    saved: "Saved",
+    batchDone: "Added {n} of {total}.",
+    skippedType:
+      "Hum Vault reads audio recordings. Choose an mp3, m4a, wav, or webm file.",
+    skippedSize: "This file is over 25 MB. Choose a shorter recording.",
+    skippedLong: "This recording is over 2 minutes. Choose a shorter one.",
+    skippedEmptyFile: "This file is empty. Choose another one.",
+    skippedEmpty: "Try a file with one steady hum, then add it again.",
+    failed: "This file did not open. Try another one.",
+  },
+
+  settings: {
+    heading: "Settings",
+    storageHeading: "Storage",
+    storageLoading: "Checking storage",
+    storageUsed: "{used} used",
+    entryCountOne: "1 idea saved",
+    entryCount: "{n} ideas saved",
+    backupHeading: "Backup",
+    backupHint: "Your ideas live in this browser. Keep a copy you can restore.",
+    export: "Export backup",
+    exporting: "Preparing your backup",
+    exportDone: "Backup downloaded.",
+    exportError: {
+      title: "Try the export again",
+      body: "The backup did not finish. Try once more.",
+      action: "Try again",
+    },
+    import: "Import backup",
+    importing: "Restoring your ideas",
+    importDone: "Restored {imported}. Skipped {skipped}.",
+    importFailedCount: "{n} did not restore.",
+    importError: {
+      title: "Choose a Hum Vault backup",
+      body: "This is not a backup file. Choose a backup zip you exported here.",
+      action: "Try again",
+    },
   },
 
   search: {
@@ -146,3 +193,16 @@ export const strings = {
 } as const;
 
 export type Strings = typeof strings;
+
+/**
+ * Fill {name} placeholders in a copy template at render time, so counts are
+ * interpolated where they are shown and never baked into the constants above.
+ */
+export function fill(
+  template: string,
+  vars: Record<string, string | number>,
+): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    Object.prototype.hasOwnProperty.call(vars, key) ? String(vars[key]) : match,
+  );
+}
