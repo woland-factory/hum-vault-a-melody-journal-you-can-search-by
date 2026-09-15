@@ -1,671 +1,502 @@
-# EPIC SPEC — The songbook (persistence)
+# EPIC SPEC: Bulk import and vault backup
 
-> This is EPIC 2 of Hum Vault. EPIC 1 shipped the capture screen: hum,
-> get playable draft notation, hear it back, all on-device and in memory
-> only. This EPIC gives those ideas somewhere to live. A captured hum
-> becomes a durable **Entry** in IndexedDB (audio, transcribed notes,
-> melody contour, draft notation, tags). The user browses a **songbook**,
-> opens an entry, plays it, renames it, tags it, edits the draft notation,
-> and deletes it. The contour index is computed and stored at save time so
-> the EPIC 3 search is instant. No search UI, no import, no export, no
-> walkthrough here.
+## Quality differentiator (this app must win here)
 
----
+**Recall of your own past ideas by ear.** Every other tool converts a hum
+once and forgets it, or keeps recordings you can only find by name. Hum Vault
+is the one place where a half-remembered fragment, hummed, returns the exact
+idea.
 
-## Quality differentiator (restate at the top of every spec)
-
-**Recall of your own past ideas by ear.** Hum Vault wins on retrieval by
-melody: a half-remembered fragment, hummed, returns the exact past idea.
-Everything else stays deliberately simple to protect that one capability.
-
-**What this EPIC owes the differentiator:** the differentiator is only as
-good as the corpus and the index it searches. This EPIC builds both. Two
-things must be right or every later search inherits the error:
-
-1. **The corpus must be durable.** An idea the user saved must still be
-   there after a reload and after the browser restarts. If entries silently
-   vanish, the promise ("no melodic idea you ever had is lost") is broken at
-   the foundation. Persist the original audio blob and the transcribed notes
-   faithfully.
-2. **The stored contour must be a faithful, key-independent index of the
-   melody.** EPIC 3 matches a hummed fragment against `Entry.contour`. This
-   EPIC computes that contour from the transcribed `notes` at save time and
-   stores it. Get the contour honest: consecutive pitch intervals (so the
-   same shape matches in any key or octave) and tempo-independent rhythm
-   ratios. Depth in this EPIC goes into a correct, deterministic contour and
-   durable storage, not into songbook chrome.
-
-This EPIC does **not** implement matching (that is EPIC 3, a binding
-non-goal here). It produces the raw material matching depends on.
+**What this EPIC owes the differentiator:** the recall mechanic is only as
+valuable as the corpus behind it. This EPIC feeds and protects that corpus. It
+fills it fast (drop a pile of old voice memos and every one becomes a searchable
+entry) and it makes the corpus durable (a full backup the user can carry off the
+device and restore intact). An imported memo must land as a fully-formed entry
+whose contour is computed exactly as a live hum's is, so search treats imported
+ideas and hummed ideas identically. A restored backup must recompute contours
+the same way, so a round-trip never degrades what search can find.
 
 ---
 
 ## Scope
 
 ### In scope
-- A **persistence layer** over IndexedDB: an `Entry` object store, a
-  `createdAt` index for newest-first listing, and typed CRUD plus bounded,
-  newest-first pagination.
-- A pure **contour** function that derives the melody index from an
-  `Entry`'s notes, stored on the entry at save time.
-- A **Save to songbook** action on the capture screen's `ready` result,
-  which persists the current hum (audio blob, notes, contour, draft ABC,
-  auto title, empty tags) as an Entry.
-- A minimal, dependency-free **hash router** and app shell so the app has
-  three client views: capture (`#/`), songbook (`#/songbook`), and entry
-  detail (`#/entry/:id`), with working browser back and deep links.
-- The **Songbook screen**: entries newest first, each row showing enough to
-  recognize the idea (title, date, tags) with a Play control and a way to
-  open the entry. Bounded query and bounded initial render (pagination), so
-  it stays smooth with hundreds of entries. Designed empty, loading, and
-  error states.
-- The **Entry detail screen**: play the entry, rename it, add and remove
-  tags, edit the draft notation, and delete it behind a confirm step.
-  Designed loading, error, and not-found states.
-- All new user-visible strings centralized in `src/copy/strings.ts` and
-  swept.
-- Automated tests proving every acceptance criterion, including an
-  end-to-end proof that a saved entry survives a page reload.
 
-### Out of scope (binding non-goals — do NOT build)
-- **The search algorithm and results UI.** No contour matching, no ranking,
-  no "hum to search" control, no `/search` view. This EPIC only *stores* the
-  contour; EPIC 3 matches against it.
-- **Bulk import** (drag-and-drop of files). EPIC 4.
-- **Export / backup** (zip, MusicXML, MIDI download, re-import, storage-usage
-  UI, "clear vault"). EPIC 4. Do not add a `/settings` view.
-- **First-run walkthrough** and **demo seed** (`SEED_DEMO`). EPIC 5. See the
-  note below on why the empty songbook state alone satisfies the bar here.
-- **Playing the raw audio blob.** See "Playback" below: entry playback is the
-  synthesized notation, consistent with capture. The original audio is stored
-  for durability and future export, not surfaced as an `<audio>` player in
-  this EPIC.
-- **Re-transcription or notes editing.** The user edits the *draft notation*
-  (`notationAbc`), a separate editable field. The transcribed `notes` and the
-  `contour` derived from them do not change when notation is hand-edited (see
-  "The notation/notes boundary").
-- Engraving-grade notation, tempo/key detection, polyphony (unchanged plan
-  non-goals).
-- Any runtime LLM, BYOK surface, or gateway call (hard plan non-goal).
+1. **Bulk import of audio files.** Drag one or more voice-memo files onto the
+   app (desktop) or pick them with a file input (mobile and desktop). Each file
+   is validated, decoded, transcribed, melody-indexed, and saved as an entry,
+   entirely on-device, with visible per-file progress. One file failing does not
+   abort the batch.
+2. **Boundary validation of imported audio.** Type and size are checked before
+   any decode work. Unsupported or oversized files get a clear per-file message
+   and are skipped; the rest of the batch proceeds.
+3. **Full vault export.** A single downloadable `.zip` containing, per entry,
+   the original audio, a MusicXML file, and a MIDI file, plus a `manifest.json`
+   carrying titles, tags, and timestamps (and the data needed for faithful
+   re-import).
+4. **Vault re-import.** Selecting an exported `.zip` restores its entries
+   faithfully (notes, contour, tags, notation, audio, title, timestamps).
+   Re-importing the same zip does not create duplicates.
+5. **Settings surface.** A new Settings screen shows storage usage and hosts
+   Export and Import. Export is reachable in two taps from the songbook.
+6. **Copy + README.** Every new user-visible string lives in `src/copy/strings.ts`
+   and passes the copy sweep. The README documents import and backup/restore.
 
-### The walkthrough non-goal vs. the quality bar (read before building)
-QUALITY BAR §4 asks for a guided first-run path. The product plan sequences
-that guided path and the demo seed into EPIC 5 and lists "walkthrough" as a
-non-goal here. This is not a bar-vs-scope conflict: the app is not yet
-"shipped", and the surfaces this EPIC adds are self-explanatory under §7. Meet
-§4's intent the honest way for this EPIC: the empty songbook state names what
-the screen is for and points at the one action that fills it (record), and the
-Save action on capture is unmistakable. **Do not build a walkthrough, coach
-marks, a tour library, or an onboarding checklist here.** If during build you
-believe a true conflict exists, stop and set the run `blocked` with the precise
-question rather than building a non-goal.
+### Out of scope (binding non-goals)
+
+- **Cloud sync** — no network calls for any of this. Everything stays on-device.
+- **Sharing links** — no shareable URLs, no export-to-a-service.
+- **Server-side storage** — no backend, no upload. The app remains client-only.
+- **Requesting persistent-storage permission** (`navigator.storage.persist()`),
+  eviction warnings, auto-backup, or scheduled backup. Showing usage and making
+  export easy is the durability promise for v1; anything beyond that is deferred.
+- **Editing during import** (renaming/tagging mid-batch), import from cloud
+  drives, or format conversion of the exported audio. Imported entries get a
+  sensible default title (the filename) and can be edited later in entry detail,
+  which already exists.
+- **A first-run walkthrough for these surfaces.** The core-action onboarding
+  belongs to the capture/search EPICs. This EPIC only ensures the import and
+  backup surfaces have clear empty/loading/error states and a discoverable entry
+  point. Do not build a guided multi-step tour here.
 
 ---
 
 ## Technical design
 
-### Stack (unchanged, plus one dev-only test polyfill)
-- Same as EPIC 1: TypeScript + React 18 + Vite, `abcjs` for render/playback,
-  `vitest` + `@testing-library/react` + `jsdom` for unit/component tests,
-  Playwright (Chromium) for the one end-to-end proof.
-- **Do not add a runtime dependency.** In particular: no router library
-  (a ~40-line hash router is the right size for three views), no IndexedDB
-  wrapper library (a small internal promise wrapper over the native API is
-  enough), no state-management library, no virtualization library
-  (pagination covers the bounded-list requirement).
-- **Add exactly one dev dependency:** `fake-indexeddb` (for unit-testing the
-  persistence layer under jsdom, which has no IndexedDB). Wire it in
-  `tests/setup.ts` with `import "fake-indexeddb/auto";`.
+The app is a client-only React + Vite + TypeScript SPA. State lives in IndexedDB
+via `src/db/entries.ts` (schema in `src/db/schema.ts`). There is no server and no
+authenticated route. This EPIC adds no server and no network I/O.
 
-### Data model (forward-only; IndexedDB version 1)
-Nothing was persisted before this EPIC, so this is the first schema. Create
-it in the database's `onupgradeneeded` handler at DB version **1**.
+### New dependency
 
-```ts
-// src/db/schema.ts
-import type { NoteEvent } from "../transcribe/types";
+Add **`fflate`** (`^0.8.x`) as a runtime `dependency`. It is a tiny (~8 KB),
+zero-dependency zip/unzip library that runs in the browser and in Node/jsdom
+(so unit tests can round-trip without a browser). Use its async `zip` / `unzip`
+(or sync `zipSync` / `unzipSync` in tests) APIs.
 
-export const DB_NAME = "humvault";
-export const DB_VERSION = 1;
-export const ENTRY_STORE = "entries";
-export const CREATED_AT_INDEX = "byCreatedAt";
-export const ENTRY_SCHEMA_VERSION = 1;   // per-record schema version
-export const CONTOUR_VERSION = 1;        // contour algorithm version
+Do NOT add a MIDI or MusicXML library. Both formats are generated deterministically
+by small pure modules (below), which keeps them unit-testable and dependency-free.
 
-// The melody search index, derived from an entry's notes at save time.
-// EPIC 3 matches a hummed fragment against this. Intervals make the match
-// key- and octave-independent; ioiRatios make rhythm tempo-independent.
-export interface MelodyContour {
-  version: number;      // CONTOUR_VERSION at compute time
-  noteCount: number;    // notes.length (cheap length prefilter for search)
-  intervals: number[];  // consecutive semitone deltas; length = max(0, n-1)
-  ioiRatios: number[];  // consecutive inter-onset-interval ratios; length = max(0, n-2)
+### Data model
+
+**No schema change and no DB version bump.** The existing `Entry` shape already
+carries everything export needs and import restores: `id`, `title`, `createdAt`,
+`updatedAt`, `audio` (Blob), `audioMimeType`, `durationSec`, `notes`, `contour`,
+`notationAbc`, `tags`, `schemaVersion`. Export and import operate on the existing
+v1 store. The forward-only migration policy in `src/db/schema.ts` is unchanged.
+
+**Source of truth for derived files.** MusicXML and MIDI are derived from an
+entry's `notes` (the transcription), the same source `computeContour` and the
+draft ABC come from. Rationale: `notes` is always present, deterministic, and is
+the canonical melodic content; the ABC draft is a rendering of it and may hold
+hand tweaks that do not map cleanly to a score or a MIDI file. Deriving from
+`notes` keeps both exporters pure and unit-testable. `notationAbc` is still
+preserved verbatim in the manifest so hand edits survive a round-trip.
+
+**Contour on import is recomputed, not trusted.** Import reconstructs each
+entry's contour with `computeContour(notes)` rather than trusting the manifest's
+copy. Because `computeContour` is deterministic and `CONTOUR_VERSION` is stable,
+the recomputed contour equals the exported one, so restore is faithful, and a
+tampered or stale manifest can never inject a bad index.
+
+### Files / modules to touch
+
+**New modules**
+
+- `src/import/validateAudioFile.ts`
+  - `export const ACCEPTED_AUDIO` — MIME + extension allowlist.
+  - `export const MAX_IMPORT_BYTES = 25 * 1024 * 1024` (25 MB per file).
+  - `export function validateAudioFile(file: File): void` — throws
+    `ValidationError` (reuse the class exported from `src/db/entries.ts`, or
+    move it to a shared module and re-export; do not duplicate it) with a clear
+    per-file message when the type is not accepted, the size is 0, or the size
+    exceeds the cap. Accept by MIME first; when `file.type` is empty (common for
+    `.m4a` on some platforms) fall back to the file extension. This is the
+    boundary validation required before any decode.
+
+- `src/import/importAudioFiles.ts`
+  - `export type FileImportStatus = "queued" | "decoding" | "reading" | "saved" | "skipped" | "failed"`
+  - `export interface FileImportItem { name: string; status: FileImportStatus; progress: number; message?: string; entryId?: string }`
+  - `export async function importAudioFiles(files: File[], onUpdate: (items: FileImportItem[]) => void): Promise<FileImportItem[]>`
+    - Processes files **sequentially** (one basic-pitch inference at a time) so
+      progress stays readable and the model is not thrashed. Emits an updated
+      item list on every state change (feedback within 100 ms of a drop).
+    - Per file: `validateAudioFile` → `decodeToMono22050` → `transcribe(audio, onProgress)`
+      (wire the existing `onProgress` fraction into `item.progress`, status
+      `"reading"`) → guard against empty transcription and against a decoded
+      duration over `MAX_IMPORT_DURATION_SEC = 120` (skip with a clear message)
+      → `notesToAbc` → `saveEntry({ ..., title: defaultTitleFromFilename(name), tags: [] })`.
+    - Default title: filename without extension, trimmed to the title limit;
+      fall back to the existing date-based default if empty.
+    - Failure isolation: any thrown error (validation, decode, empty result,
+      save) sets that item to `"skipped"` (validation/empty/oversize) or
+      `"failed"` (unexpected) with a message and **continues to the next file**.
+      Never let one rejection abort the loop.
+
+- `src/export/musicXml.ts`
+  - `export function notesToMusicXml(notes: NoteEvent[], meta: { title: string }): string`
+  - Pure and deterministic. Emit a minimal valid MusicXML 3.x `score-partwise`
+    document for a single-voice melody, quantized on the same 1/16 grid and
+    120 BPM / 4-4 assumptions `notesToAbc` uses, with rests for gaps. The same
+    `NoteEvent[]` always yields the same XML string.
+
+- `src/export/midi.ts`
+  - `export function notesToMidi(notes: NoteEvent[]): Uint8Array`
+  - Pure and deterministic. Emit a Standard MIDI File (format 0, single track):
+    header chunk + one track with a tempo meta event (120 BPM), note-on/note-off
+    pairs derived from `pitchMidi`/`startSec`/`durationSec` at a fixed PPQ
+    (e.g. 480), and an end-of-track meta event. The same `NoteEvent[]` always
+    yields the same bytes.
+
+- `src/export/exportVault.ts`
+  - `export const BACKUP_FORMAT = "hum-vault-backup"` and `export const BACKUP_VERSION = 1`.
+  - `export interface BackupManifest { format: string; version: number; exportedAt: number; entryCount: number; entries: BackupEntry[] }` where `BackupEntry` carries
+    `{ id, title, tags, createdAt, updatedAt, durationSec, audioMimeType, schemaVersion, notes, contour, notationAbc, files: { audio, musicxml, midi } }`.
+  - `export async function buildVaultZip(onProgress?: (done: number, total: number) => void): Promise<Blob>`
+    - Reads the **whole** corpus (loop `listEntries` by page via `nextBefore`;
+      do not cap at the search backstop). For each entry writes
+      `entries/<id>/audio.<ext>` (ext from a mime→extension map, default `.bin`),
+      `entries/<id>/notation.musicxml`, `entries/<id>/notation.mid`, and appends
+      to the manifest. Writes `manifest.json` at the zip root. Returns a
+      `Blob` of type `application/zip`.
+    - `export function downloadVaultZip(blob: Blob): void` — object-URL + anchor
+      click, filename `hum-vault-backup-<YYYY-MM-DD>.zip`; revoke the URL after.
+
+- `src/import/importVault.ts`
+  - `export interface VaultImportResult { imported: number; skipped: number; failed: number; total: number }`
+  - `export async function importVaultZip(file: File, onProgress?: (done: number, total: number) => void): Promise<VaultImportResult>`
+    - `unzip` the file, read and JSON-parse `manifest.json`. Reject with a clear
+      error when the file is not a zip, `manifest.json` is missing/unparseable,
+      or `format`/`version` are unrecognized (accept `version === 1`).
+    - For each manifest entry: read the referenced audio bytes, build a `Blob`
+      with `audioMimeType`; validate `title`/`tags`/`notationAbc`/`notes` at the
+      boundary; recompute `contour` via `computeContour(notes)`; call
+      `putImportedEntry` (below). A missing audio file or a validation failure
+      for one entry increments `failed` and **continues**; an entry whose `id`
+      already exists increments `skipped`.
+
+- `src/db/storage.ts`
+  - `export async function getStorageEstimate(): Promise<{ usageBytes: number | null; quotaBytes: number | null; entryCount: number }>`
+    — `navigator.storage.estimate()` when available (else nulls), plus
+    `countEntries()`. Never throws; degrade to `entryCount` only.
+
+- `src/components/SettingsScreen.tsx` — the Settings route (below).
+
+- `src/components/ImportPanel.tsx` — the drop zone + file picker + per-file
+  progress list, used on the capture screen. (May be inlined into
+  `CaptureScreen` if that reads cleaner; a component keeps `CaptureScreen`
+  focused.)
+
+**Modified modules**
+
+- `src/db/entries.ts`
+  - `export function putImportedEntry(entry: Entry): Promise<"imported" | "skipped">`
+    — validates `title`/`notationAbc`/`tags` and the presence of `audio`/`notes`,
+    then, in one `readwrite` transaction, checks whether `entry.id` already
+    exists: if so resolves `"skipped"` without writing; otherwise `put`s the
+    entry **preserving** `id`, `createdAt`, `updatedAt`, and `schemaVersion`, and
+    resolves `"imported"`. This is what makes repeated import idempotent.
+  - If `ValidationError` is moved to a shared module, keep a re-export here so
+    existing imports do not break.
+
+- `src/router/useHashRoute.ts` — add a `{ name: "settings" }` route and parse
+  `"/settings"`.
+
+- `src/App.tsx` — render `SettingsScreen` for the `settings` route.
+
+- `src/components/SongbookScreen.tsx` — add a subordinate **Settings** control
+  in the topbar (tap 1) so Export (tap 2, on the Settings screen) is reachable
+  in two taps. Keep "Hum to search" the single primary action; Settings is a
+  quiet link/icon, visibly subordinate.
+
+- `src/components/CaptureScreen.tsx` — surface the import affordance on the idle
+  capture screen (render `ImportPanel`), so a new user with a pile of memos can
+  fill the vault. Recording stays the primary action; import is subordinate.
+
+- `src/copy/strings.ts` — add all new strings (see Copy section).
+
+- `README.md` — document bulk import and backup/restore.
+
+- `package.json` — add `fflate`.
+
+### Zip layout (contract)
+
+```
+manifest.json
+entries/<id>/audio.<ext>
+entries/<id>/notation.musicxml
+entries/<id>/notation.mid
+```
+
+`manifest.json`:
+
+```json
+{
+  "format": "hum-vault-backup",
+  "version": 1,
+  "exportedAt": 1757900000000,
+  "entryCount": 2,
+  "entries": [
+    {
+      "id": "…", "title": "…", "tags": ["…"],
+      "createdAt": 0, "updatedAt": 0, "durationSec": 0,
+      "audioMimeType": "audio/webm", "schemaVersion": 1,
+      "notes": [ { "pitchMidi": 60, "startSec": 0, "durationSec": 0.5 } ],
+      "contour": { "version": 1, "noteCount": 0, "intervals": [], "ioiRatios": [] },
+      "notationAbc": "…",
+      "files": { "audio": "entries/…/audio.webm", "musicxml": "entries/…/notation.musicxml", "midi": "entries/…/notation.mid" }
+    }
+  ]
 }
-
-export interface Entry {
-  id: string;            // crypto.randomUUID()
-  title: string;
-  createdAt: number;     // epoch ms; the newest-first sort key
-  updatedAt: number;     // epoch ms
-  audio: Blob;           // the original recording, stored as a Blob
-  audioMimeType: string; // blob.type at capture, e.g. "audio/webm"
-  durationSec: number;   // decoded audio length in seconds
-  notes: NoteEvent[];    // the transcription (unchanged shape from EPIC 1)
-  contour: MelodyContour;// derived from notes; the search index
-  notationAbc: string;   // editable draft ABC (from notesToAbc, then user edits)
-  tags: string[];
-  schemaVersion: number; // ENTRY_SCHEMA_VERSION at save time
-}
 ```
 
-**Object store:** `keyPath: "id"`. One index: `CREATED_AT_INDEX` on
-`createdAt` (not unique). All listing goes through this index so no query
-scans the whole store unsorted.
+### Privacy / security (QUALITY BAR §5, adapted to a client-only app)
 
-**Forward-only migration policy (state this in a comment in `schema.ts`):**
-future EPICs bump `DB_VERSION` and add steps to `onupgradeneeded`; they never
-delete or destructively rewrite existing records. `schemaVersion` and
-`contour.version` on each record let later code detect and upgrade old records
-in place.
-
-Blobs are stored directly; IndexedDB persists `Blob` values natively, so the
-original audio round-trips without base64 encoding.
-
-### Persistence layer API (`src/db/entries.ts`)
-A thin, typed, promise-based wrapper. Open the DB once (module-level cached
-promise) and reuse the connection.
-
-```ts
-export function saveEntry(input: {
-  audio: Blob;
-  audioMimeType: string;
-  durationSec: number;
-  notes: NoteEvent[];
-  notationAbc: string;
-  title: string;
-  tags: string[];
-}): Promise<Entry>;
-// Assigns id (crypto.randomUUID), createdAt=updatedAt=Date.now(),
-// schemaVersion, and computes contour = computeContour(notes) INTERNALLY so
-// "contour is derived from notes" is enforced in one place. Puts and returns
-// the full Entry.
-
-export function getEntry(id: string): Promise<Entry | undefined>;
-
-export function listEntries(opts?: {
-  limit?: number;    // default 30
-  before?: number;   // createdAt of the last row of the previous page
-}): Promise<{ entries: Entry[]; nextBefore: number | null }>;
-// Newest first. Opens a "prev" (descending) cursor on CREATED_AT_INDEX.
-// When `before` is set, bounds the range with upperBound(before, true) so
-// paging continues after the previous page. Collects up to `limit`.
-// nextBefore = last returned entry's createdAt when a full page came back
-// (more may exist), otherwise null.
-
-export function updateEntry(
-  id: string,
-  patch: Partial<Pick<Entry, "title" | "tags" | "notationAbc">>,
-): Promise<Entry>;
-// Reads, applies patch, sets updatedAt = Date.now(), puts, returns the
-// updated Entry. Only title, tags, and notationAbc are patchable here.
-// notes and contour are immutable in this EPIC.
-
-export function deleteEntry(id: string): Promise<void>;
-
-export function countEntries(): Promise<number>;
-// store.count() — O(1)-ish in IndexedDB; used for the songbook count badge.
-```
-
-Validate inputs at this boundary (QUALITY BAR §5), even though everything is
-local: reject a `saveEntry`/`updateEntry` with a `title` longer than 120
-chars, a `notationAbc` longer than 20000 chars, more than 20 tags, any tag
-longer than 30 chars after trim, or an empty/whitespace tag. Trim tags and
-drop duplicates before storing.
-
-Wrap IndexedDB errors so callers get a rejected promise they can turn into a
-designed state. A `QuotaExceededError` on save must surface the save-error
-state, never crash.
-
-### Contour computation (`src/melody/contour.ts`) — pure and deterministic
-```ts
-export function computeContour(notes: NoteEvent[]): MelodyContour;
-```
-- Sort a copy of `notes` by `startSec` (defensive; the transcription already
-  orders them).
-- `intervals[i] = round(notes[i+1].pitchMidi) - round(notes[i].pitchMidi)`
-  for each adjacent pair. Integer semitones. This is what makes matching
-  key- and octave-independent: the same melodic shape hummed higher or lower
-  yields identical intervals.
-- Inter-onset interval `ioi[i] = notes[i+1].startSec - notes[i].startSec`.
-  `ioiRatios[i] = ioi[i+1] / max(ioi[i], EPSILON)` with a small epsilon
-  (e.g. `1e-4`) to avoid divide-by-zero. Ratios are tempo-independent: humming
-  the same rhythm faster or slower yields the same ratios.
-- `noteCount = notes.length`. `version = CONTOUR_VERSION`.
-- Edge cases: 0 or 1 note produces empty `intervals` and `ioiRatios`;
-  2 notes produce one interval and no ratio. Never throw.
-
-This function is **pure**: the same `notes` always yields the same contour.
-That determinism is what the unit test pins, and it is the property EPIC 3
-relies on. Keep the raw arrays here (no bucketing or quantization); EPIC 3
-owns any coarsening it needs at match time and may raise `CONTOUR_VERSION`
-if it changes the representation.
-
-### The notation/notes boundary (a deliberate design decision)
-The plan's data model says `notationAbc` is "regenerated from notes and user
-edits" while `contour` is "derived from notes". So in this EPIC:
-- At save, `notationAbc = notesToAbc(notes)` (the EPIC 1 draft) and
-  `contour = computeContour(notes)`.
-- Editing the draft notation on the detail screen changes only
-  `notationAbc` (and `updatedAt`). It does **not** change `notes` or
-  `contour`. Search therefore matches the transcription, not hand edits.
-State this in a code comment and in the README's "how it works" note.
-Reconciling hand edits back into the search index is a later concern; do not
-build it here.
-
-### Routing and app shell (`src/router/useHashRoute.ts`, `src/App.tsx`)
-Add a tiny hash router. Hash routing needs no nginx change (the existing
-`try_files ... /index.html` already serves the SPA, and the hash never
-reaches the server).
-
-- `useHashRoute()` reads `window.location.hash`, subscribes to
-  `hashchange`, and returns the current route. Provide a `navigate(path)`
-  helper that sets `location.hash`.
-- Routes:
-  - `#/` or empty → **CaptureScreen**
-  - `#/songbook` → **SongbookScreen**
-  - `#/entry/:id` → **EntryDetailScreen** with the parsed `id`
-  - anything else → navigate to `#/`
-- `App.tsx` switches on the route. Keep it a plain switch; no nested router
-  abstraction.
-- Navigation affordances (kept subordinate to each screen's one primary
-  action, per §7):
-  - **Capture** shows a subtle "Songbook" link (with the entry count when
-    > 0) that navigates to `#/songbook`. The primary action stays Record.
-  - **Songbook** shows a primary "Record a hum" action that navigates to
-    `#/`, and each row opens `#/entry/:id`.
-  - **Entry detail** shows a back affordance to `#/songbook`.
-
-### Shared playback (`src/playback/player.ts`)
-Three surfaces can now play audio (capture, songbook row, entry detail). Add
-a module-level singleton so only one melody plays at a time:
-```ts
-export function getSharedPlayer(): MelodyPlayer; // lazily creates one instance
-export function disposeSharedPlayer(): void;
-```
-- Refactor `CaptureScreen` to use `getSharedPlayer()` instead of its own
-  `createPlayer()` ref, and to `stop()` (not `dispose()`) the shared player
-  on unmount. Keep `createPlayer` exported for tests.
-- Songbook and detail call `getSharedPlayer().play(visualObj)`; because it is
-  the same instance, starting one entry stops the previous one.
-
-### Rendering ABC to a playable object off the detail view (`src/notation/renderAbc.ts`)
-The songbook list must be able to play a row without mounting a full
-`NotationView` per row. Add:
-```ts
-export function abcToVisualObj(abc: string): VisualObj | null;
-```
-It renders `abc` with `abcjs.renderAbc` into a transient, visually-hidden,
-in-DOM container (create it, render, read `rendered[0]`, remove the
-container) and returns the tune object the synth needs. Return `null` on
-failure so callers can show the playback-error state. The `EntryDetailScreen`
-may instead reuse the existing `NotationView` (which already lifts the visual
-object via `onRendered`) since it shows the notation anyway.
-
-### Save flow on the capture screen (`src/components/CaptureScreen.tsx`)
-The `ready` phase currently keeps only `abc`. To save, it must also retain the
-source blob, the transcribed `notes`, the `audioMimeType`, and `durationSec`.
-- In `runPipeline`, capture the decoded audio length: `durationSec =
-  decodedFloat32.length / 22050`. Retain the source `Blob` and its `.type`,
-  and the `notes` array, in refs/state alongside `abc`.
-- In the `ready` phase, add a **primary** "Save to songbook" button (the
-  existing Play/Record-another become clearly secondary while a save is
-  offered, or Save sits as the primary above them). On tap:
-  - Give feedback within 100ms (pressed/disabled state, label → "Saving").
-  - Call `saveEntry({ audio, audioMimeType, durationSec, notes,
-    notationAbc: abc, title: defaultTitle(), tags: [] })`.
-  - On success, show "Saved" and reveal a way to the songbook (navigate to
-    `#/songbook`, or an inline "View in songbook" link). Do not silently
-    stay on a stale screen.
-  - On failure (including quota), show the designed save-error state with a
-    retry; never a raw error.
-- `defaultTitle()` returns a friendly, editable default such as
-  `"Hum, Sep 11"` using the entry's date via `toLocaleDateString` with
-  `{ month: "short", day: "numeric" }`. Titles need not be unique.
-- Saving is offered for any `ready` result, including the "Try an example"
-  path (it produces a legitimate melody). Do not special-case it.
-
-### Songbook screen (`src/components/SongbookScreen.tsx` + a row component)
-- On mount, `listEntries({ limit: 30 })`. Show a **loading** state
-  (skeleton rows or an in-place spinner that holds layout) while the first
-  page loads. Never a white screen.
-- **Empty state** (zero entries): a designed surface (see copy) with the
-  screen's purpose and a primary "Record a hum" action to `#/`.
-- **Populated:** render rows newest first. Each row shows the title, a
-  relative or short date, its tags, and a **Play** control, and the whole
-  row (or a clear affordance) opens `#/entry/:id`. Row Play lazily builds a
-  visual object via `abcToVisualObj(entry.notationAbc)` and plays it through
-  the shared player; tapping another row's Play stops the first. Give the
-  pressed/active state within 100ms.
-- **Pagination (bounded list):** initial page of 30. When `nextBefore` is
-  not null, show a "Show more" control that appends the next page via
-  `listEntries({ limit: 30, before: nextBefore })`. The query is always
-  bounded by the cursor + limit (satisfies "no unindexed query on a hot
-  path; no endpoint that gets slower with every row"). Note the tie caveat:
-  `createdAt` from `Date.now()` is effectively unique at human save rates; do
-  not worry about sub-millisecond ties.
-- **Error state:** if `listEntries` rejects, show the designed songbook load
-  error with a Reload action.
-- Mobile-first at 390px: single-column rows, 44px touch targets, no
-  horizontal scroll.
-
-### Entry detail screen (`src/components/EntryDetailScreen.tsx`)
-- On mount, `getEntry(id)`. Loading state holds layout. If the entry is
-  missing (bad id or already deleted), show the designed **not-found** state
-  with a link back to the songbook.
-- Show the entry title (as an editable field), the rendered draft notation
-  (reuse `NotationView` for render + Play), the tags, and the actions below.
-- **Rename:** an editable title input, saved on blur or an explicit save,
-  persisted via `updateEntry(id, { title })`. Optimistic: reflect the new
-  title immediately; on failure show the save-error state and revert.
-- **Tags:** a tag editor. Chips with an accessible remove control
-  (`aria-label` "Remove tag {tag}"), plus an input and an Add action.
-  Adding/removing persists via `updateEntry(id, { tags })`, applying the
-  boundary validation above. Optimistic update with feedback within 100ms.
-- **Edit draft notation:** an "Edit notation" toggle reveals a labeled
-  `<textarea>` seeded with `notationAbc`. Editing re-renders a live preview
-  via `NotationView`/`renderAbc`. Save persists via
-  `updateEntry(id, { notationAbc })`; the change is reflected in playback
-  (the synth sounds the edited ABC). Guard empty/oversize input.
-- **Delete:** a Delete action opens an accessible **confirm dialog**
-  (`role="dialog"`, `aria-modal="true"`, labelled by its title, focus moved
-  into the dialog, Escape and a Cancel/"Keep" button dismiss it, focus
-  returns to the trigger). Confirm calls `deleteEntry(id)`, then navigates to
-  `#/songbook`. On failure, show the save-error state.
-- Mobile-first at 390px, semantic headings, labeled inputs, visible focus.
-
-### Security / quality-bar notes specific to this EPIC
-- Client-only, no server, no data leaves the device: QUALITY BAR §5's
-  server-side authorization and rate-limiting clauses are satisfied
-  vacuously (there is nothing to authorize and no endpoint to throttle).
-  State this in the README, as EPIC 1 did. The relevant hygiene here is
-  **input validation at the boundary** (the `saveEntry`/`updateEntry`
-  limits above), graceful handling of storage quota, and **no PII in logs**
-  (never log audio, notes, contour, tags, or titles).
-- No secrets are added; the env/telemetry wiring from EPIC 1 is unchanged.
-
----
-
-## User-visible copy (write these verbatim into `src/copy/strings.ts`; pre-swept)
-
-Add these under the existing `strings` object so `tests/copy.test.ts` scans
-them automatically. They are pre-swept for em-dashes, banned LLM vocabulary,
-and negative empty-state phrasing. If you change a string, re-sweep it.
-
-- Nav / actions:
-  - Songbook link and heading: `Songbook`
-  - Save action on capture: `Save to songbook`
-  - Saving in progress: `Saving`
-  - Saved confirmation: `Saved`
-  - View saved entry link: `View in songbook`
-  - Back to songbook: `Songbook`
-  - Record from songbook: `Record a hum`
-  - Show more entries: `Show more`
-  - Play (list and detail): `Play`
-- Songbook empty state:
-  - title: `Start your songbook`
-  - body: `Every hum you save lands here, ready to play back. Record your first idea to begin.`
-  - action: `Record a hum`
-- Songbook load error:
-  - title: `Reload to open your songbook`
-  - body: `The songbook could not open just now. Reload the page to try again.`
-  - action: `Reload`
-- Save error (capture and detail):
-  - title: `Try saving again`
-  - body: `The save could not finish. Try once more.`
-  - action: `Try again`
-- Entry detail labels:
-  - title field label: `Title`
-  - tags label: `Tags`
-  - add-tag placeholder: `Add a tag`
-  - add-tag action: `Add`
-  - remove-tag label prefix: `Remove tag` (compose `Remove tag {tag}` for aria)
-  - notation section heading: `Draft notation`
-  - edit-notation action: `Edit notation`
-  - save-notation action: `Save`
-  - notation textarea label: `Notation`
-  - delete action: `Delete`
-- Entry not found:
-  - title: `Back to the songbook`
-  - body: `This idea is not in your songbook. It may have been removed.`
-  - action: `Songbook`
-- Delete confirm dialog:
-  - title: `Delete this idea?`
-  - body: `This removes the recording and its notation from this device. This cannot be undone.`
-  - confirm: `Delete`
-  - cancel: `Keep`
-
-(The EPIC 1 strings, including `record.tryExample`, `ready.play`,
-`ready.startOver`, and the error states, stay as they are.)
-
----
-
-## Files / modules
-
-### New
-```
-src/
-  db/
-    schema.ts                 Entry, MelodyContour, DB constants, migration comment
-    entries.ts                openDb + saveEntry/getEntry/listEntries/updateEntry/deleteEntry/countEntries
-  melody/
-    contour.ts                computeContour(notes) -> MelodyContour (pure)
-  router/
-    useHashRoute.ts           hash route hook + navigate()
-  notation/
-    renderAbc.ts              abcToVisualObj(abc) for list playback
-  components/
-    SongbookScreen.tsx        list, pagination, empty/loading/error states
-    EntryRow.tsx              one list row: title, date, tags, Play, open
-    EntryDetailScreen.tsx     play, rename, tags, edit notation, delete
-    TagEditor.tsx             chips + add/remove (used by detail)
-    ConfirmDialog.tsx         accessible modal confirm (used for delete)
-  styles/
-    songbook.css              (or extend existing app.css)
-tests/
-  contour.test.ts
-  entries.test.ts             uses fake-indexeddb
-  songbookScreen.test.tsx
-  entryDetail.test.tsx
-  captureSave.test.tsx        Save action persists an Entry
-  e2e/
-    songbook.spec.ts          save -> reload -> persists -> open -> play at 390px
-```
-
-### Changed
-```
-src/App.tsx                   switch on useHashRoute()
-src/components/CaptureScreen.tsx  retain notes/blob/duration; Save action + states; use shared player
-src/playback/player.ts        add getSharedPlayer()/disposeSharedPlayer()
-src/copy/strings.ts           add the strings above
-tests/setup.ts                import "fake-indexeddb/auto";
-package.json                  add devDependency: fake-indexeddb
-```
+- No network I/O anywhere in this EPIC. Zip is built and downloaded locally;
+  import reads the chosen file locally. Audio never leaves the device.
+- Input validated at every boundary: dropped files (type + size before decode),
+  imported manifest and per-entry fields (types, sizes, array shapes) before any
+  DB write. Reuse the existing title/tag/notation limits.
+- No PII in logs. Follow the existing `listContours` precedent: log counts only,
+  never titles, notes, contours, or filenames.
+- No authenticated routes exist (client-only), so there is nothing to authorize
+  server-side; state this in the README privacy note, consistent with the
+  current one.
 
 ---
 
 ## Ordered task list (with acceptance criteria)
 
-### Task 1 — Contour index (pure)
-Implement `src/melody/contour.ts` and `src/db/schema.ts` (the types and
-constants `contour` depends on).
-**Done when:**
-- `computeContour` is pure and deterministic: a fixed `NoteEvent[]` fixture
-  always yields the same `MelodyContour`.
-- `intervals` are the consecutive integer semitone deltas; humming the same
-  shape shifted by a constant number of semitones (any key/octave) yields
-  identical `intervals`.
-- `ioiRatios` are the consecutive inter-onset-interval ratios and are
-  unchanged when every time value is scaled by a constant (tempo change).
-- 0-, 1-, and 2-note inputs are handled without throwing (empty arrays where
-  there are not enough notes).
+Each task's criteria are provable by the tests named in the Test plan.
 
-### Task 2 — IndexedDB persistence layer
-Implement `src/db/entries.ts` and wire `fake-indexeddb` into `tests/setup.ts`;
-add the dev dependency.
-**Done when:**
-- The DB opens at version 1, creating the `entries` store (keyPath `id`) and
-  the `byCreatedAt` index in `onupgradeneeded`.
-- `saveEntry` assigns `id`/timestamps/`schemaVersion`, computes
-  `contour = computeContour(notes)` internally, stores the audio `Blob`, and
-  returns the full `Entry`.
-- `getEntry` round-trips a stored entry, and the returned `audio` is a `Blob`
-  whose bytes and type match what was saved.
-- `listEntries` returns entries newest first and pages correctly with
-  `limit`/`before`/`nextBefore`, never loading the whole store at once.
-- `updateEntry` patches only title/tags/notationAbc and bumps `updatedAt`;
-  `deleteEntry` removes; `countEntries` returns the count.
-- Boundary validation rejects oversize titles/notation, too many tags,
-  oversize or empty tags; tags are trimmed and de-duplicated.
+### T1. Boundary validation for imported audio
+Build `validateAudioFile` with the MIME/extension allowlist, size cap, and
+zero-byte guard.
+- **AC1.1** A file whose type is not in the allowlist (and whose extension is not
+  either) throws `ValidationError` with a clear, human message.
+- **AC1.2** A file over `MAX_IMPORT_BYTES` throws with a clear size message.
+- **AC1.3** A `.m4a` file reported with an empty `type` is accepted via its
+  extension.
+- **AC1.4** Validation runs and can reject **before** any decode call.
 
-### Task 3 — Router and app shell
-Implement `src/router/useHashRoute.ts`, switch `src/App.tsx` on it, and add
-`getSharedPlayer()`/`disposeSharedPlayer()` to `src/playback/player.ts`.
-**Done when:**
-- `#/` renders capture, `#/songbook` renders the songbook, `#/entry/:id`
-  renders detail for that id, and an unknown hash redirects to `#/`.
-- Browser back moves between views; deep-linking `#/entry/:id` directly loads
-  that entry.
-- Only one melody plays at a time across screens (shared player); the
-  existing capture e2e and capture component test still pass.
+### T2. Deterministic MusicXML and MIDI exporters
+Build `notesToMusicXml` and `notesToMidi`.
+- **AC2.1** `notesToMusicXml` returns a well-formed `score-partwise` document
+  containing a `<note>` for each transcribed note; identical input yields an
+  identical string.
+- **AC2.2** `notesToMidi` returns bytes beginning with the `MThd` header and one
+  `MTrk` track, with a note-on/note-off pair per note; identical input yields
+  identical bytes.
+- **AC2.3** Both handle an empty `notes` array without throwing (valid empty
+  score / empty track).
 
-### Task 4 — Save from capture
-Wire the "Save to songbook" action into `CaptureScreen`'s `ready` phase,
-retaining notes, the source blob, `audioMimeType`, and `durationSec`.
-**Done when:**
-- After a non-empty result, tapping Save persists an `Entry` (audio blob,
-  notes, contour, `notationAbc`, an editable default title, empty tags) and
-  gives feedback within 100ms.
-- On success the user sees "Saved" and a way to the songbook.
-- A save failure (including simulated quota) shows the designed save-error
-  state with retry, never a raw error, and the app stays usable.
+### T3. Bulk import pipeline with per-file progress and failure isolation
+Build `importAudioFiles` and wire the existing `transcribe` `onProgress`.
+- **AC3.1** Importing N valid files saves N entries; each item reaches `"saved"`
+  and carries its `entryId`.
+- **AC3.2** Each item passes through visible states with a progress fraction
+  during `"reading"`; `onUpdate` fires on every transition.
+- **AC3.3** A batch containing one invalid file (bad type / oversize / empty
+  transcription) marks exactly that item `"skipped"` or `"failed"` with a message
+  and still saves every valid file. The batch never aborts on one failure.
+- **AC3.4** An imported entry's `contour` is computed by the same `saveEntry`
+  path as a live hum, so search treats it identically.
 
-### Task 5 — Songbook screen
-Implement `SongbookScreen` and `EntryRow` with designed empty, loading, and
-error states and bounded pagination.
-**Done when:**
-- With no entries, the designed empty state shows its purpose and a primary
-  "Record a hum" action.
-- With entries, the list shows them newest first; each row plays the entry
-  through the shared player (pressed state within 100ms) and opens its detail.
-- The first render shows a loading state that holds layout, then real
-  content; a load failure shows the designed error state.
-- "Show more" appends the next page; the query stays bounded (cursor + limit)
-  and the screen stays smooth with hundreds of entries.
-- Usable at 390px: no horizontal scroll, 44px touch targets.
+### T4. Full vault export
+Build `buildVaultZip` / `downloadVaultZip` and the mime→extension map.
+- **AC4.1** The zip contains `manifest.json` plus, per entry, an audio file, a
+  `notation.musicxml`, and a `notation.mid` under `entries/<id>/`.
+- **AC4.2** The manifest lists every entry with title, tags, and timestamps
+  (and the fields import needs).
+- **AC4.3** Export reads the entire corpus by paging, not just the search
+  backstop; a corpus larger than one page still exports fully.
 
-### Task 6 — Entry detail screen
-Implement `EntryDetailScreen`, `TagEditor`, and `ConfirmDialog`.
-**Done when:**
-- The screen plays the entry, and renames persist and survive reopening.
-- Tags can be added and removed, persist, and respect the validation limits.
-- The draft notation can be edited, the edit persists, playback reflects the
-  edit, and `notes`/`contour` are unchanged by the edit.
-- Delete opens an accessible confirm dialog (focus moved in, Escape/Keep
-  dismisses, focus returns); confirming removes the entry and returns to the
-  songbook.
-- A missing entry shows the designed not-found state; failures show the
-  save-error state, never a raw error.
-- Usable at 390px, inputs labeled, visible focus, keyboard reaches every
-  control.
+### T5. Vault re-import with dedup
+Build `importVaultZip` and `putImportedEntry`.
+- **AC5.1** Importing a zip produced by T4 restores each entry with matching
+  `notes`, recomputed-and-equal `contour`, `tags`, `notationAbc`, `title`,
+  `createdAt`, and audio bytes/mime.
+- **AC5.2** Importing the same zip a second time adds nothing new: every entry
+  is reported `skipped`, and the total entry count is unchanged.
+- **AC5.3** A zip missing `manifest.json`, or with an unknown `format`/`version`,
+  or that is not a zip, fails with a clear message and writes nothing.
+- **AC5.4** One entry with a missing audio file or invalid fields is counted
+  `failed` while the other entries still import.
 
-### Task 7 — Copy
-Add every new string above to `src/copy/strings.ts` and use them from the new
-components. No user-visible string is hardcoded in a component.
-**Done when:** `tests/copy.test.ts` passes with the new strings, and a manual
-read of the songbook, entry detail, and the delete dialog sounds human.
+### T6. Settings screen: storage usage + export + import (two-tap export)
+Build `SettingsScreen`, the `/settings` route, and the songbook link.
+- **AC6.1** From the songbook, Settings opens in one tap and Export runs in the
+  next (two taps total).
+- **AC6.2** Settings shows storage usage (used space when
+  `navigator.storage.estimate` is available) and the entry count; it degrades to
+  the entry count alone when the API is missing, without error.
+- **AC6.3** Settings hosts Export (downloads the zip) and Import (accepts a zip
+  and shows the imported/skipped/failed summary).
+- **AC6.4** Export, import, and storage read each have designed idle, working,
+  done, and error states. No white screen, no raw error text.
 
-### Task 8 — Tests and end-to-end proof
-See the test plan. All listed automated tests pass in the foreground.
+### T7. Capture-screen import affordance
+Render `ImportPanel` on the idle capture screen.
+- **AC7.1** The idle capture screen shows a discoverable way to add existing
+  audio files, with a **file input** (mobile baseline) and a **drop target**
+  (desktop enhancement). Recording remains the primary action.
+- **AC7.2** Dropping or choosing files shows the per-file progress list from T3.
+
+### T8. Copy, README, and quality-bar pass
+- **AC8.1** Every new user-visible string is in `src/copy/strings.ts` and the
+  copy sweep (`tests/copy.test.ts`) passes: no em/en dashes, no banned
+  vocabulary, no negative empty-state phrasing.
+- **AC8.2** The README documents bulk import and backup/restore with accurate
+  steps, and the README copy sweep still passes.
+- **AC8.3** All new surfaces are usable at 390px with no horizontal scroll,
+  ~44px touch targets, labeled inputs, and visible focus states.
 
 ---
 
-## Test plan (which test proves each criterion)
+## Quality bar mapping (BINDING)
 
-Automated, run in the foreground to completion.
-
-1. **`contour.test.ts` (vitest, unit)** — feed fixed `NoteEvent[]` fixtures
-   and assert exact `MelodyContour` output; assert a key/octave shift leaves
-   `intervals` unchanged and a tempo scale leaves `ioiRatios` unchanged;
-   assert 0/1/2-note edge cases. *Proves the contour is deterministic,
-   key-independent, and correctly derived from notes.*
-
-2. **`entries.test.ts` (vitest + fake-indexeddb)** — save entries and assert:
-   `getEntry` round-trips including the audio `Blob` (bytes and type);
-   `saveEntry` stored a `contour` equal to `computeContour(notes)`;
-   `listEntries` returns newest first and pages with `before`/`nextBefore`;
-   `updateEntry` changes only title/tags/notationAbc and bumps `updatedAt`;
-   `deleteEntry` removes; boundary validation rejects the oversize/invalid
-   inputs. *Proves durable storage, newest-first bounded listing, edit/delete,
-   contour-at-save, and boundary validation.*
-
-3. **`captureSave.test.tsx` (vitest + Testing Library)** — mock the recorder,
-   transcribe, decode, player, and `db/entries`. Drive a non-empty result,
-   tap "Save to songbook", and assert `saveEntry` was called with the notes,
-   `notationAbc`, audio blob, a non-empty title, and empty tags, and that the
-   UI shows the saved confirmation. Also assert a rejected `saveEntry` shows
-   the save-error state. *Proves the save path and its designed failure.*
-
-4. **`songbookScreen.test.tsx` (vitest + Testing Library)** — mock
-   `db/entries` and the player. Assert: empty result renders the designed
-   empty state with the record action; a seeded list renders newest first
-   with Play and open affordances; a row Play calls the shared player; "Show
-   more" requests and appends the next page; a rejected `listEntries` renders
-   the designed error state. *Proves the list, empty/error states, ordering,
-   playback, and pagination.*
-
-5. **`entryDetail.test.tsx` (vitest + Testing Library)** — mock `db/entries`,
-   the player, and abcjs render. Assert: rename calls `updateEntry({title})`;
-   adding and removing a tag calls `updateEntry({tags})` with validated
-   values; editing notation calls `updateEntry({notationAbc})`; Delete opens
-   the confirm dialog and confirming calls `deleteEntry` then navigates; a
-   missing entry renders the not-found state. *Proves rename, tags, notation
-   edit, and confirmed delete.*
-
-6. **`copy.test.ts` (vitest, unit)** — the existing sweep flattens `strings`;
-   the new strings are covered automatically. Keep it green. *Proves the copy
-   sweep on all new strings.*
-
-7. **`e2e/songbook.spec.ts` (Playwright, Chromium)** — at a 390px viewport,
-   drive capture through the deterministic "Try an example" path to a `ready`
-   result, tap "Save to songbook", navigate to the songbook and assert the
-   entry appears, then **reload the page** and assert the entry is still
-   listed (this is the strongest proof the entry lives in IndexedDB, not
-   memory, and survives a reload; a browser restart reuses the same on-disk
-   IndexedDB, so reload persistence is the load-bearing proof). Open the
-   entry, assert its detail renders and Play is enabled, and assert no
-   horizontal scroll at 390px. *Proves durability across reload, the songbook
-   listing, and open/play end to end.* The existing `e2e/capture.spec.ts`
-   must still pass unchanged.
-
-Map back to the planner's acceptance criteria:
-- Durable Entry (incl. audio blob) surviving reload/restart → Tests 2 and 7.
-- Songbook newest-first, plays any entry, opens detail, smooth with hundreds
-  (capped/paginated) → Tests 2, 4, and 7.
-- Entry detail rename / add-remove tags / edit notation / delete with confirm
-  → Test 5.
-- Each saved Entry stores a contour derived from its notes → Tests 1 and 2.
-- Empty songbook designed state pointing at recording → Test 4.
-- Copy sweep passes on all new strings → Test 6.
+- **Perceived speed (§1):** per-file rows appear within 100 ms of a drop/choose;
+  progress updates continuously during transcription; export and import show
+  in-place progress; the Settings storage read shows a placeholder then a value.
+  Export pages the corpus (no unbounded synchronous scan on the hot path).
+- **Mobile-first (§2):** file input is the baseline path (mobile browsers have no
+  drag-and-drop); drag-drop is the desktop enhancement. Everything works and
+  fits at 390px.
+- **Designed states (§3):** import panel has an idle prompt, per-file progress,
+  and per-file error rows plus a batch summary; export/import each have
+  idle/working/done/error; Settings has a loading placeholder for storage.
+- **First-run (§4):** unchanged core onboarding (owned elsewhere). The import
+  affordance on the idle capture screen makes the cold-start path discoverable
+  in one short line. No new walkthrough here.
+- **Security hygiene (§5):** as in the Privacy/security section. Client-only,
+  boundary validation everywhere, counts-only logging.
+- **Accessibility (§6):** every new input labeled; drop zone reachable and
+  operable by keyboard via its file input; visible focus; sufficient contrast.
+- **Radically simple (§7):** one primary action per screen (capture: Record;
+  songbook: Hum to search; settings: Export). Import, drop zone, and Settings
+  link are visibly subordinate. Short labels, a real filename as the default
+  title, no instruction paragraphs.
+- **Copy (§8):** all strings centralized and swept (T8).
+- **README (§9):** import/backup documented for strangers.
 
 ---
 
-## Definition of done for this EPIC
-Every task above is complete; every listed automated test passes in the
-foreground (including `contour`, `entries`, the three screen tests, the copy
-sweep, and both Playwright specs); a hum saved from capture appears in the
-songbook and is still there after a page reload; entries can be played,
-renamed, tagged, notation-edited, and deleted behind a confirm; each saved
-entry carries a contour derived from its notes; the empty songbook is a
-designed state; and the app stays usable at 390px with designed empty,
-loading, and error states throughout. No search UI, import, export, or
-walkthrough has been added.
+## Copy (draft strings, pre-swept — add to `src/copy/strings.ts`)
+
+Sweep every one of these before shipping (no `—`/`–`, no banned words, positive
+phrasing). Suggested `strings` additions:
+
+```
+import: {
+  heading: "Add from files",
+  hint: "Drop voice memos here, or choose files.",
+  choose: "Choose files",
+  reading: "Reading",        // shown with the per-file progress
+  decoding: "Opening",
+  saved: "Saved",
+  batchDone: "Added {n} of {total}.",   // fill n/total at render
+  skippedType: "Hum Vault reads audio recordings. Choose an mp3, m4a, wav, or webm file.",
+  skippedSize: "This file is over 25 MB. Choose a shorter recording.",
+  skippedEmpty: "Try a file with one steady hum, then add it again.",
+  failed: "This file did not open. Try another one.",
+},
+settings: {
+  heading: "Settings",
+  storageHeading: "Storage",
+  storageUsed: "{used} used",           // e.g. "12 MB used"
+  entryCount: "{n} ideas saved",
+  export: "Export backup",
+  exporting: "Preparing your backup",
+  exportDone: "Backup downloaded.",
+  exportError: { title: "Try the export again", body: "The backup did not finish. Try once more.", action: "Try again" },
+  import: "Import backup",
+  importing: "Restoring your ideas",
+  importDone: "Restored {imported}. Skipped {skipped}.",  // fill counts
+  importError: { title: "Choose a Hum Vault backup", body: "This is not a backup file. Choose a backup zip you exported here.", action: "Try again" },
+},
+nav: { settings: "Settings" }  // add alongside existing nav strings
+```
+
+These are drafts. The implementer may reword for their exact UI as long as the
+sweep still passes and phrasing stays positive and short. Numbers/counts are
+interpolated at render, not baked into the constant.
+
+---
+
+## Test plan
+
+Tests use the existing infra: Vitest + jsdom + `fake-indexeddb` (each test file
+resets the DB per the current `tests/setup.ts`), Testing Library for components,
+and the pinned Playwright container (`scripts/e2e.sh`) for end-to-end. `fflate`
+runs under jsdom, so zip round-trips are unit-testable without a browser.
+
+### Unit
+
+- `tests/validateAudioFile.test.ts` (T1): a table of accepted MIME types,
+  accepted-by-extension `.m4a` with empty type, rejected type, oversize, and
+  zero-byte. Proves AC1.1–AC1.4.
+- `tests/musicXml.test.ts` (T2): a fixed `NoteEvent[]` yields a stable string
+  containing one `<note>` per note and parses as XML; empty input yields a valid
+  empty score. Proves AC2.1, AC2.3.
+- `tests/midi.test.ts` (T2): output starts with `MThd`, contains one `MTrk`, has
+  the expected note-on/note-off count, and is byte-stable across runs; empty
+  input is handled. Proves AC2.2, AC2.3.
+- `tests/exportVault.test.ts` (T4): save several entries, `buildVaultZip`,
+  `unzip`, and assert `manifest.json` plus per-entry audio/musicxml/midi paths;
+  seed more than one page and assert every entry is present. Proves AC4.1–AC4.3.
+- `tests/importVault.test.ts` (T5): round-trip (export → clear DB → import) and
+  assert restored `notes`, `contour` (equal to a fresh `computeContour(notes)`),
+  `tags`, `notationAbc`, `title`, `createdAt`, and audio byte length/mime;
+  import the same zip twice and assert the count is unchanged and all `skipped`;
+  feed a non-zip / a zip without a manifest / an unknown version and assert a
+  thrown clear error with no writes; corrupt one entry's audio path and assert it
+  is `failed` while others import. Proves AC5.1–AC5.4.
+- `tests/entries.test.ts` (extend, T5): `putImportedEntry` preserves `id`,
+  `createdAt`, `updatedAt`, and returns `"skipped"` for an existing `id`.
+- `tests/importAudioFiles.test.ts` (T3): with `decodeToMono22050` and
+  `transcribe` mocked, importing three files where one throws yields two `saved`
+  and one `skipped`/`failed`, `onUpdate` fires per transition, and progress
+  reaches 1 for saved files. Proves AC3.1–AC3.3. AC3.4 is covered by asserting a
+  saved import produces the same contour as the direct `saveEntry` path for the
+  same notes.
+
+### Component
+
+- `tests/settingsScreen.test.tsx` (T6): renders storage usage from a mocked
+  `getStorageEstimate`, falls back to entry count when estimate returns nulls,
+  triggers `buildVaultZip` on Export (mock the download), and shows the
+  imported/skipped summary on Import. Proves AC6.2–AC6.4.
+- `tests/importPanel.test.tsx` (T7): choosing files renders per-file rows and
+  reflects saved/failed states (pipeline mocked). Proves AC7.1–AC7.2.
+- `tests/copy.test.ts` (existing, T8): automatically scans the new `strings`
+  entries; add nothing but the strings themselves. Proves AC8.1.
+
+### End-to-end (`tests/e2e/backup.spec.ts`, at 390px)
+
+- Import: from the capture screen, use the file input to add the bundled sample
+  (`tests/fixtures/simple-hum.wav`) and confirm a new songbook entry appears; no
+  horizontal scroll. (Proves AC3.1/AC7 in a real browser.)
+- Two-tap export: from the songbook, open Settings (tap 1), Export (tap 2), and
+  assert a `.zip` download event fires. (Proves AC6.1, AC4.)
+- Round-trip: import that downloaded zip back in a fresh context and assert the
+  entry is restored; import it again and assert no duplicate row appears.
+  (Proves AC5.1–AC5.2.) If driving a downloaded file back through the file
+  chooser is impractical in the container, cover the round-trip in
+  `importVault.test.ts` (unit) and keep the e2e to import-file + export-download.
+
+A criterion is met only when its test passes **and** the surface clears the
+quality bar above (mobile layout, designed states, swept copy).
+
+---
+
+## Open decisions resolved (so the implementer does not have to ask)
+
+- **Derived-file source:** `notes`, not `notationAbc` (see Data model).
+- **Contour on import:** recomputed from `notes`, manifest copy is informational.
+- **Dedup key:** entry `id`; repeated import is idempotent via `putImportedEntry`.
+- **Concurrency:** import files sequentially.
+- **Caps:** 25 MB/file; 120 s decoded duration/file; export pages the full
+  corpus (no cap).
+- **Two taps:** Songbook → Settings → Export.
+- **No DB migration:** existing v1 schema suffices.
+- **`persist()` and eviction UX:** out of scope (deferred).
