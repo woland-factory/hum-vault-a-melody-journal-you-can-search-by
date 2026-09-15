@@ -55,6 +55,35 @@ The search runs entirely in the browser over your own saved ideas. There is no
 server and no music catalog: it only ever finds tunes you have saved, and the
 query hum is matched in memory and never saved.
 
+### Add from files (bulk import)
+
+Old voice memos can fill the vault in one go. On the capture screen, drop
+audio files onto **Add from files** (desktop) or tap **Choose files** (works
+everywhere, including phones). Each file is validated, decoded, transcribed,
+and saved as a regular entry, entirely on-device, with a per-file progress row.
+One unreadable file is skipped with a short note while the rest of the batch
+continues.
+
+Accepted formats: mp3, m4a, wav, webm, ogg, aac, and flac, up to 25 MB and 2
+minutes per file. Each imported entry is titled after its filename (rename it
+any time in the entry detail) and is indexed for hum search exactly like a live
+recording.
+
+### Back up and restore
+
+Your songbook lives in this browser's IndexedDB. **Settings** (linked from the
+songbook) shows how much space it uses and holds the backup tools:
+
+- **Export backup** downloads a single zip with, per entry, the original audio,
+  a MusicXML score, and a MIDI file, plus a `manifest.json` carrying titles,
+  tags, timestamps, and notes. The MusicXML and MIDI files also make every idea
+  portable to notation and DAW software.
+- **Import backup** restores a previously exported zip: notes, tags, notation,
+  audio, titles, and timestamps come back intact, and each entry's search
+  contour is recomputed from its notes, so recall by humming works exactly as
+  before. Importing the same backup twice is safe: entries that already exist
+  are skipped, never duplicated.
+
 ## Run it locally
 
 Requires [Node.js](https://nodejs.org/) 22+.
@@ -106,7 +135,9 @@ src/
   transcribe/   basic-pitch model loading and monophonic note extraction
   notation/     Deterministic NoteEvent[] -> draft ABC, and ABC -> playable tune
   melody/       Pure contour (search index), the melodic matcher, and helpers
-  db/           IndexedDB schema and the typed Entry CRUD layer
+  import/       Audio file validation, bulk import, and backup zip restore
+  export/       Vault backup zip, plus pure MusicXML and MIDI exporters
+  db/           IndexedDB schema, the typed Entry CRUD layer, storage usage
   router/       Tiny hash router for the capture, songbook, search, and entry views
   playback/     abcjs synth wrapper, self-hosted soundfont, shared player
   util/         Small helpers (date formatting)
