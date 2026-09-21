@@ -16,13 +16,6 @@ export default defineConfig({
     trace: "retain-on-failure",
     actionTimeout: 15_000,
     navigationTimeout: 15_000,
-    launchOptions: {
-      args: [
-        "--no-sandbox",
-        "--use-fake-ui-for-media-stream",
-        "--use-fake-device-for-media-stream",
-      ],
-    },
   },
   webServer: {
     // Production build served by vite preview, never a dev server.
@@ -32,5 +25,32 @@ export default defineConfig({
     timeout: 180_000,
     env: { NODE_OPTIONS: "--max-old-space-size=2048" },
   },
-  projects: [{ name: "desktop", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    {
+      name: "desktop",
+      // Chromium runs the full model pipeline via the fake media stream. These
+      // launch args are Chromium-only, so they stay scoped to this project and
+      // never reach WebKit.
+      testIgnore: /mobile-safari\.spec\.ts/,
+      use: {
+        ...devices["Desktop Chrome"],
+        launchOptions: {
+          args: [
+            "--no-sandbox",
+            "--use-fake-ui-for-media-stream",
+            "--use-fake-device-for-media-stream",
+          ],
+        },
+      },
+    },
+    {
+      // The WebKit engine mobile Safari uses, at the iPhone 390px viewport. This
+      // is the CI-provable proxy for "works on an iPhone"; a real-device mic
+      // pass is documented in VERIFICATION.md. Only the mobile-safari spec runs
+      // here so the Chromium-only specs are not forced onto WebKit.
+      name: "mobile-safari",
+      testMatch: /mobile-safari\.spec\.ts/,
+      use: { ...devices["iPhone 13"] },
+    },
+  ],
 });
