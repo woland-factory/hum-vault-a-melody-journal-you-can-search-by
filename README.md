@@ -55,6 +55,13 @@ The search runs entirely in the browser over your own saved ideas. There is no
 server and no music catalog: it only ever finds tunes you have saved, and the
 query hum is matched in memory and never saved.
 
+Recall quality is measured, not asserted. `tests/fixtures/searchCorpus.ts` holds
+a fixed corpus of melodies and query hums, and `tests/search.test.ts` proves the
+bar against it: a genuine fragment (transposed to another key, hummed faster or
+slower, one note off) ranks its own entry in the top three, with the exact case
+first, and an unrelated hum returns no match. Tuning the matcher means keeping
+that fixture green.
+
 ### Try the demo
 
 To show off search without a microphone, set `SEED_DEMO=1`. On first load the
@@ -169,7 +176,11 @@ bash scripts/e2e.sh   # end-to-end test in the pinned Playwright container
 `scripts/e2e.sh` runs the suite inside the official Playwright image so the
 browser build matches the pinned `@playwright/test` version. The end-to-end
 tests build the production bundle and drive the app in a real browser, including
-a save-then-reload proof that a saved entry persists in IndexedDB.
+a save-then-reload proof that a saved entry persists in IndexedDB. They run
+across two projects: `desktop` (Chromium, the full model pipeline) and
+`mobile-safari` (WebKit at a 390px iPhone viewport, the engine mobile Safari
+uses). `VERIFICATION.md` documents the one manual step left: a microphone pass
+on a physical iPhone.
 
 Storage isolation: unit tests run against
 [`fake-indexeddb`](https://github.com/dumbmatter/fakeIndexedDB) under jsdom, and

@@ -1,502 +1,527 @@
-# EPIC SPEC: Bulk import and vault backup
+# EPIC SPEC: Polish pass
 
 ## Quality differentiator (this app must win here)
 
-**Recall of your own past ideas by ear.** Every other tool converts a hum
-once and forgets it, or keeps recordings you can only find by name. Hum Vault
-is the one place where a half-remembered fragment, hummed, returns the exact
-idea.
+**Recall of your own past ideas by ear.** Every other tool converts a hum once
+and forgets it, or keeps recordings you can only find by name. Hum Vault is the
+one place where a half-remembered fragment, hummed, returns the exact idea. We
+win on retrieval by melody, and keep everything else deliberately simple to
+protect it.
 
-**What this EPIC owes the differentiator:** the recall mechanic is only as
-valuable as the corpus behind it. This EPIC feeds and protects that corpus. It
-fills it fast (drop a pile of old voice memos and every one becomes a searchable
-entry) and it makes the corpus durable (a full backup the user can carry off the
-device and restore intact). An imported memo must land as a fully-formed entry
-whose contour is computed exactly as a live hum's is, so search treats imported
-ideas and hummed ideas identically. A restored backup must recompute contours
-the same way, so a round-trip never degrades what search can find.
+**What this EPIC owes the differentiator:** this is a refinement pass, not a
+feature pass, so its duty to the differentiator is to prove and protect it, not
+to extend it. Two things carry that weight. First, recall quality must be
+*measured*, not asserted: the search matcher's top-3 behavior is pinned to a
+fixed fixture of query hums, and any tuning stays inside the existing matcher
+without adding surface. Second, recall must stay fast and reachable as the vault
+grows: the search hot path must not degrade at hundreds of entries, and the
+whole retrieval flow (hum to search, ranked results, play, open) must work on a
+390px mobile-Safari-class browser, because that is where a musician actually
+reaches for a half-remembered tune.
 
 ---
 
 ## Scope
 
+This EPIC is a UX, performance, accessibility, and copy pass over the whole
+delivered product (capture, songbook, search, entry detail, settings, import,
+export, walkthrough, demo). It tightens what already ships against the QUALITY
+BAR and the quality differentiator. It adds **no new features and no new user-
+facing surface.** The planner marked this EPIC `polish: true`, and its scope is
+a pure refinement pass; both agree.
+
+Much of the bar is already met by the delivered code (paginated songbook reads,
+a contour-only search read with a perf guardrail, `webkitAudioContext`
+fallbacks, focus-visible styles, skeletons, centralized swept copy, a complete
+README). For those areas the work is to *verify and lock in* the behavior with a
+test that fails if it regresses, not to rebuild it. Where a real gap exists
+(mobile-Safari/WebKit coverage, corpus-scale guards on a couple of hot paths,
+small accessibility refinements), the work is to close it with the smallest
+change that clears the bar.
+
 ### In scope
 
-1. **Bulk import of audio files.** Drag one or more voice-memo files onto the
-   app (desktop) or pick them with a file input (mobile and desktop). Each file
-   is validated, decoded, transcribed, melody-indexed, and saved as an entry,
-   entirely on-device, with visible per-file progress. One file failing does not
-   abort the batch.
-2. **Boundary validation of imported audio.** Type and size are checked before
-   any decode work. Unsupported or oversized files get a clear per-file message
-   and are skipped; the rest of the batch proceeds.
-3. **Full vault export.** A single downloadable `.zip` containing, per entry,
-   the original audio, a MusicXML file, and a MIDI file, plus a `manifest.json`
-   carrying titles, tags, and timestamps (and the data needed for faithful
-   re-import).
-4. **Vault re-import.** Selecting an exported `.zip` restores its entries
-   faithfully (notes, contour, tags, notation, audio, title, timestamps).
-   Re-importing the same zip does not create duplicates.
-5. **Settings surface.** A new Settings screen shows storage usage and hosts
-   Export and Import. Export is reachable in two taps from the songbook.
-6. **Copy + README.** Every new user-visible string lives in `src/copy/strings.ts`
-   and passes the copy sweep. The README documents import and backup/restore.
+1. **Mobile-Safari / WebKit verification at 390px.** The five core flows
+   (capture, save, search, import, export) run and are verified on a WebKit
+   engine at a 390px viewport, and microphone capture is confirmed to negotiate
+   a Safari-supported path. See T1 for the automatable proof and the documented
+   manual iOS-device check.
+2. **Perceived-speed tightening.** Every interactive control gives visible
+   feedback within ~100ms of a tap (pressed/disabled/pending/optimistic), and no
+   hot path (songbook list, search ranking) degrades as the corpus grows to
+   hundreds of entries.
+3. **Designed empty / loading / error states on every screen.** Each screen's
+   three states render a designed surface with a next step, never a raw error,
+   error code, stack, or dead end.
+4. **Search ranking measured against a fixed fixture.** The documented top-3 bar
+   is proven against `tests/fixtures/searchCorpus.ts`, and any tuning stays
+   inside `src/melody/search.ts` with no new option or surface.
+5. **Accessibility basics.** Visible focus on every interactive element, every
+   input labeled, sufficient contrast, keyboard reaches every control, exactly
+   one `<h1>` and a `<main>` landmark per screen, error surfaces announced
+   assertively, the confirm dialog focus-trapped with Escape and focus restore.
+6. **Full human-voice copy sweep across every screen.** No em-dash or en-dash,
+   no banned LLM vocabulary, no negative empty-state phrasing in any user-visible
+   string, and no user-visible string bypassing `src/copy/strings.ts`.
+7. **README for strangers.** Understand, run (verified against the actual
+   `Dockerfile` / `docker-compose.staging.yml` / `package.json` scripts), and
+   contribute, with no pipeline jargon.
 
 ### Out of scope (binding non-goals)
 
-- **Cloud sync** — no network calls for any of this. Everything stays on-device.
-- **Sharing links** — no shareable URLs, no export-to-a-service.
-- **Server-side storage** — no backend, no upload. The app remains client-only.
-- **Requesting persistent-storage permission** (`navigator.storage.persist()`),
-  eviction warnings, auto-backup, or scheduled backup. Showing usage and making
-  export easy is the durability promise for v1; anything beyond that is deferred.
-- **Editing during import** (renaming/tagging mid-batch), import from cloud
-  drives, or format conversion of the exported audio. Imported entries get a
-  sensible default title (the filename) and can be edited later in entry detail,
-  which already exists.
-- **A first-run walkthrough for these surfaces.** The core-action onboarding
-  belongs to the capture/search EPICs. This EPIC only ensures the import and
-  backup surfaces have clear empty/loading/error states and a discoverable entry
-  point. Do not build a guided multi-step tour here.
+- **Any new feature.** No new screen, control, format, setting, or capability.
+  If a change would add user-facing surface, it is out of scope for this EPIC.
+- **Gold-plating past the written bar.** No animations nobody specified, no
+  design system for a handful of screens, no premature optimization beyond the
+  budgets below, no re-architecture. Meeting the bar is in scope; exceeding it
+  is drift.
+- **Everything already fenced by the product plan** stays out: no accounts,
+  server, cloud sync, polyphony, engraving-grade notation, commercial-catalog
+  matching, sharing, lyrics, DAW features, native app, runtime LLM,
+  monetization.
+- **Changing the search algorithm's shape or adding matcher options/surface.**
+  Tuning the existing constants to keep the fixture green is allowed; adding a
+  new ranking mode, a second index, or a new public function is not.
+- **Reworking the DB schema or bumping `DB_VERSION`.** The delivered v2 schema
+  stands. This EPIC touches no migration.
 
 ---
 
 ## Technical design
 
-The app is a client-only React + Vite + TypeScript SPA. State lives in IndexedDB
-via `src/db/entries.ts` (schema in `src/db/schema.ts`). There is no server and no
-authenticated route. This EPIC adds no server and no network I/O.
+The app is a client-only React + Vite + TypeScript SPA. State lives in
+IndexedDB (`src/db/`). There is no server and no authenticated route. This EPIC
+adds no runtime dependency, no schema change, and no network I/O. It changes
+test infrastructure, adds regression tests, and makes small, surgical edits to
+existing components/styles where a bar gap is found.
 
-### New dependency
+### Current state (verified) — what NOT to rebuild
 
-Add **`fflate`** (`^0.8.x`) as a runtime `dependency`. It is a tiny (~8 KB),
-zero-dependency zip/unzip library that runs in the browser and in Node/jsdom
-(so unit tests can round-trip without a browser). Use its async `zip` / `unzip`
-(or sync `zipSync` / `unzipSync` in tests) APIs.
+The implementer must confirm each of these still holds and lock it with a test;
+do not re-implement working behavior.
 
-Do NOT add a MIDI or MusicXML library. Both formats are generated deterministically
-by small pure modules (below), which keeps them unit-testable and dependency-free.
+- **Paginated songbook reads.** `listEntries` (`src/db/entries.ts`) pages
+  newest-first through the `byCreatedAt` index, 30 per page, returning
+  `nextBefore`. It never scans the whole store for a page.
+- **Cheap search read.** `listContours` returns only `{ id, title, contour }`
+  per entry (no audio, no notes), capped at `MAX_SEARCH_CORPUS = 2000` with a
+  count-only log past the cap. `rankMatches` (`src/melody/search.ts`) is a pure
+  O(sum of contour lengths) scan; `tests/search.test.ts` already has a
+  ~1000-contour guardrail under 500ms.
+- **Safari audio groundwork.** `src/audio/decode.ts` and `src/playback/player.ts`
+  both fall back to `webkitAudioContext` and `player.ts` calls
+  `audioContext.resume()` on a suspended context. `src/audio/recorder.ts` tags
+  the recorded blob with the real `recorder.mimeType` (so a Safari `audio/mp4`
+  recording is labeled correctly), not a hardcoded type.
+- **Designed states surface.** `StatusMessage` (`src/components/StatusMessage.tsx`)
+  renders a titled, bodied, actioned surface for empty/error states; screens
+  render skeletons (`.skeleton*` in `src/styles/app.css`) while loading.
+- **Accessibility base.** Every screen renders `<main className="screen">` and
+  one `<h1>` (exception: `EntryDetailScreen`, see the gap below); focus-visible
+  outlines exist on `.btn`, `.link`, `.input`, `.entry-row__open`,
+  `.tag-chip__remove`, `.walkthrough__skip`, and the file-input labels; inputs
+  carry labels/aria-labels; `ConfirmDialog` uses `aria-labelledby`.
+- **Centralized, swept copy.** All strings live in `src/copy/strings.ts`;
+  `tests/copy.test.ts` sweeps them plus demo titles, the README, and
+  `.env.example`.
+- **README + deploy files.** `README.md` documents run-local, Docker, and
+  Docker-compose paths; `Dockerfile`, `docker-compose.staging.yml`,
+  `scripts/e2e.sh`, and `scripts/check-staging.sh` all exist.
 
-### Data model
+### Confirmed gaps to close
 
-**No schema change and no DB version bump.** The existing `Entry` shape already
-carries everything export needs and import restores: `id`, `title`, `createdAt`,
-`updatedAt`, `audio` (Blob), `audioMimeType`, `durationSec`, `notes`, `contour`,
-`notationAbc`, `tags`, `schemaVersion`. Export and import operate on the existing
-v1 store. The forward-only migration policy in `src/db/schema.ts` is unchanged.
-
-**Source of truth for derived files.** MusicXML and MIDI are derived from an
-entry's `notes` (the transcription), the same source `computeContour` and the
-draft ABC come from. Rationale: `notes` is always present, deterministic, and is
-the canonical melodic content; the ABC draft is a rendering of it and may hold
-hand tweaks that do not map cleanly to a score or a MIDI file. Deriving from
-`notes` keeps both exporters pure and unit-testable. `notationAbc` is still
-preserved verbatim in the manifest so hand edits survive a round-trip.
-
-**Contour on import is recomputed, not trusted.** Import reconstructs each
-entry's contour with `computeContour(notes)` rather than trusting the manifest's
-copy. Because `computeContour` is deterministic and `CONTOUR_VERSION` is stable,
-the recomputed contour equals the exported one, so restore is faithful, and a
-tampered or stale manifest can never inject a bad index.
+1. **No WebKit / mobile-Safari test coverage.** `playwright.config.ts` defines a
+   single `desktop` project (`Desktop Chrome`). The existing e2e specs run at a
+   390px viewport but only under Chromium, and they drive the pipeline through
+   the deterministic "Try an example" path (the live mic is never exercised in
+   CI). Nothing verifies the app on the WebKit engine that mobile Safari uses.
+2. **No corpus-scale guard on the songbook/search hot paths.** The perf
+   guardrail covers the pure matcher, but there is no test proving the songbook
+   list still reads only one page (and search stays under budget) with hundreds
+   of saved entries end to end.
+3. **Error surfaces are announced politely, not assertively.** `StatusMessage`
+   and the capture/settings error lines use `role="status"` (aria-live polite)
+   for both info and error tones. An error state should be `role="alert"`
+   (assertive) so a screen reader announces the failure and its next step.
+4. **`EntryDetailScreen` has no `<h1>`.** Its title is an editable `<input>`
+   (`aria-label` "Title"), so the screen currently exposes no top-level heading,
+   breaking the "one `<h1>` and semantic headings per screen" rule.
+5. **`SearchScreen` non-results phases have no `<h1>`.** The results phase renders
+   an `<h1>`, but the loading, empty-corpus, transcribing, no-match, no-notes, and
+   error phases render only the back link plus a `StatusMessage` `<h2>`, leaving an
+   orphan heading in those states.
+6. **Toggle buttons lack `aria-pressed`.** The Play controls (`EntryRow`,
+   `NotationView`) and the Record button convey their active/playing state with a
+   CSS class and a label swap only, not `aria-pressed`.
+7. **Songbook "Show more" has no pending state.** It sets `disabled` while loading
+   but keeps the same label, with no in-place progress cue, so the "load more"
+   tap has no visible pending feedback (a §1 gap).
+8. **Minor announce gaps.** The `Walkthrough` step chip is `role="note"` (not a
+   live region), so a step change is not announced; the `TagEditor` group label is
+   a styled `<span>`, not a semantic label. Address only if cheap; neither adds
+   surface.
 
 ### Files / modules to touch
 
-**New modules**
+**Test infrastructure (new / modified)**
 
-- `src/import/validateAudioFile.ts`
-  - `export const ACCEPTED_AUDIO` — MIME + extension allowlist.
-  - `export const MAX_IMPORT_BYTES = 25 * 1024 * 1024` (25 MB per file).
-  - `export function validateAudioFile(file: File): void` — throws
-    `ValidationError` (reuse the class exported from `src/db/entries.ts`, or
-    move it to a shared module and re-export; do not duplicate it) with a clear
-    per-file message when the type is not accepted, the size is 0, or the size
-    exceeds the cap. Accept by MIME first; when `file.type` is empty (common for
-    `.m4a` on some platforms) fall back to the file extension. This is the
-    boundary validation required before any decode.
+- `playwright.config.ts` — add a **`mobile-safari`** project using a WebKit
+  device descriptor at a 390px-wide viewport (e.g. `devices["iPhone 13"]` or an
+  explicit `{ ...devices["Desktop Safari"], viewport: { width: 390, height: 800 } }`).
+  Keep the existing `desktop` project. The Chromium-only launch args
+  (`--use-fake-*-for-media-stream`) must not be applied to the WebKit project;
+  scope them to `desktop` if they are moved onto a project.
+- `scripts/e2e.sh` — ensure the pinned Playwright container run installs and
+  exercises WebKit (the official image already ships it). If the script pins a
+  browser install, add `webkit`. Do not change the container tag/pin otherwise.
+- `tests/e2e/mobile-safari.spec.ts` (new) — the WebKit flow proof (T1).
+- `tests/e2e/*.spec.ts` (existing) — no behavior change; they continue to run
+  under `desktop`. Where a WebKit run needs a deterministic corpus without live
+  model inference, seed via the existing `SEED_DEMO` path or a small
+  IndexedDB seed helper rather than depending on model inference under WebKit
+  (see T1 rationale). Do not add product code to support seeding beyond what
+  already exists.
+- `tests/perfHotPaths.test.ts` (new) — corpus-scale guard for the songbook and
+  search reads (T2).
+- Component test files (existing, extended): `tests/captureScreen.test.tsx`,
+  `tests/songbookScreen.test.tsx`, `tests/searchScreen.test.tsx`,
+  `tests/entryDetail.test.tsx`, `tests/settingsScreen.test.tsx`,
+  `tests/importPanel.test.tsx`, `tests/walkthrough.test.tsx` — add the
+  immediate-feedback, designed-state, and accessibility assertions (T2, T3, T5).
+- `tests/recorder.test.ts` (new or fold into an existing audio test) — the
+  Safari-safe MediaRecorder mime negotiation assertion (T1).
+- `tests/copy.test.ts` (existing) — extend to guard against user-visible string
+  literals bypassing `strings.ts` (T6), if that guard is not already implied.
 
-- `src/import/importAudioFiles.ts`
-  - `export type FileImportStatus = "queued" | "decoding" | "reading" | "saved" | "skipped" | "failed"`
-  - `export interface FileImportItem { name: string; status: FileImportStatus; progress: number; message?: string; entryId?: string }`
-  - `export async function importAudioFiles(files: File[], onUpdate: (items: FileImportItem[]) => void): Promise<FileImportItem[]>`
-    - Processes files **sequentially** (one basic-pitch inference at a time) so
-      progress stays readable and the model is not thrashed. Emits an updated
-      item list on every state change (feedback within 100 ms of a drop).
-    - Per file: `validateAudioFile` → `decodeToMono22050` → `transcribe(audio, onProgress)`
-      (wire the existing `onProgress` fraction into `item.progress`, status
-      `"reading"`) → guard against empty transcription and against a decoded
-      duration over `MAX_IMPORT_DURATION_SEC = 120` (skip with a clear message)
-      → `notesToAbc` → `saveEntry({ ..., title: defaultTitleFromFilename(name), tags: [] })`.
-    - Default title: filename without extension, trimmed to the title limit;
-      fall back to the existing date-based default if empty.
-    - Failure isolation: any thrown error (validation, decode, empty result,
-      save) sets that item to `"skipped"` (validation/empty/oversize) or
-      `"failed"` (unexpected) with a message and **continues to the next file**.
-      Never let one rejection abort the loop.
+**Product code (surgical edits only, where a gap is found)**
 
-- `src/export/musicXml.ts`
-  - `export function notesToMusicXml(notes: NoteEvent[], meta: { title: string }): string`
-  - Pure and deterministic. Emit a minimal valid MusicXML 3.x `score-partwise`
-    document for a single-voice melody, quantized on the same 1/16 grid and
-    120 BPM / 4-4 assumptions `notesToAbc` uses, with rests for gaps. The same
-    `NoteEvent[]` always yields the same XML string.
+- `src/components/StatusMessage.tsx` — when `tone === "error"`, render
+  `role="alert"` (assertive) instead of `role="status"`; keep `role="status"`
+  for info/empty. No prop or API change beyond honoring the existing `tone`.
+- `src/components/CaptureScreen.tsx`, `src/components/SettingsScreen.tsx` — the
+  inline **error** lines that currently use `role="status"` become `role="alert"`.
+  Success/progress lines stay `role="status"` / `aria-live="polite"`.
+- `src/components/EntryDetailScreen.tsx` — add exactly one `<h1>` for the screen.
+  The smallest fix: render the entry title as the screen `<h1>` above the rename
+  field, or add a visually-hidden `<h1>` (e.g. reusing the existing detail
+  heading copy) so the screen has a programmatic top-level heading. Do not add a
+  new visible control or restructure the screen.
+- `src/components/SearchScreen.tsx` — ensure every phase renders one `<h1>` (its
+  non-results phases render only a `StatusMessage` `<h2>` today). Reuse the
+  existing search heading copy; add no new visible control.
+- `src/components/SongbookScreen.tsx` — give the **Show more** control an
+  in-place pending state (disabled plus a pending label or cue) while the next
+  page loads.
+- `src/components/EntryRow.tsx`, `src/components/NotationView.tsx`,
+  `src/components/RecordButton.tsx` — add `aria-pressed` to the Play/Record
+  toggle buttons reflecting their active state. No visual change required.
+- `src/components/Walkthrough.tsx`, `src/components/TagEditor.tsx` — optional
+  announce/label refinements (AC5.5), only if cheap; no surface change.
+- `src/audio/recorder.ts` — only if T1 shows a Safari gap: negotiate the
+  MediaRecorder mime type with `MediaRecorder.isTypeSupported` (prefer a
+  Safari-supported type such as `audio/mp4`, fall back to `audio/webm`, else let
+  the browser default), and keep tagging the blob with the real
+  `recorder.mimeType`. If the current default-constructor behavior already
+  produces a decodable blob under WebKit, leave it and only add the guarding
+  test. This is a correctness tightening, not a feature.
+- `src/styles/app.css` — only if the a11y/contrast/touch-target audit (T5) finds
+  a specific shortfall (a control under ~44px, an outline that does not show, a
+  contrast pair below 4.5:1). Fix the specific rule; do not restyle broadly.
+- `src/copy/strings.ts`, `README.md` — only if the sweep (T6/T7) finds a hit.
 
-- `src/export/midi.ts`
-  - `export function notesToMidi(notes: NoteEvent[]): Uint8Array`
-  - Pure and deterministic. Emit a Standard MIDI File (format 0, single track):
-    header chunk + one track with a tempo meta event (120 BPM), note-on/note-off
-    pairs derived from `pitchMidi`/`startSec`/`durationSec` at a fixed PPQ
-    (e.g. 480), and an end-of-track meta event. The same `NoteEvent[]` always
-    yields the same bytes.
+**No changes** to `src/db/schema.ts` (no migration), the search algorithm's
+public API, or any data shape.
 
-- `src/export/exportVault.ts`
-  - `export const BACKUP_FORMAT = "hum-vault-backup"` and `export const BACKUP_VERSION = 1`.
-  - `export interface BackupManifest { format: string; version: number; exportedAt: number; entryCount: number; entries: BackupEntry[] }` where `BackupEntry` carries
-    `{ id, title, tags, createdAt, updatedAt, durationSec, audioMimeType, schemaVersion, notes, contour, notationAbc, files: { audio, musicxml, midi } }`.
-  - `export async function buildVaultZip(onProgress?: (done: number, total: number) => void): Promise<Blob>`
-    - Reads the **whole** corpus (loop `listEntries` by page via `nextBefore`;
-      do not cap at the search backstop). For each entry writes
-      `entries/<id>/audio.<ext>` (ext from a mime→extension map, default `.bin`),
-      `entries/<id>/notation.musicxml`, `entries/<id>/notation.mid`, and appends
-      to the manifest. Writes `manifest.json` at the zip root. Returns a
-      `Blob` of type `application/zip`.
-    - `export function downloadVaultZip(blob: Blob): void` — object-URL + anchor
-      click, filename `hum-vault-backup-<YYYY-MM-DD>.zip`; revoke the URL after.
+### Perceived-speed budgets (BINDING, per QUALITY BAR §1)
 
-- `src/import/importVault.ts`
-  - `export interface VaultImportResult { imported: number; skipped: number; failed: number; total: number }`
-  - `export async function importVaultZip(file: File, onProgress?: (done: number, total: number) => void): Promise<VaultImportResult>`
-    - `unzip` the file, read and JSON-parse `manifest.json`. Reject with a clear
-      error when the file is not a zip, `manifest.json` is missing/unparseable,
-      or `format`/`version` are unrecognized (accept `version === 1`).
-    - For each manifest entry: read the referenced audio bytes, build a `Blob`
-      with `audioMimeType`; validate `title`/`tags`/`notationAbc`/`notes` at the
-      boundary; recompute `contour` via `computeContour(notes)`; call
-      `putImportedEntry` (below). A missing audio file or a validation failure
-      for one entry increments `failed` and **continues**; an entry whose `id`
-      already exists increments `skipped`.
+- **Immediate feedback (~100ms):** every control that starts async work must
+  change appearance *synchronously* on the same event that starts the work,
+  before the promise settles. Concretely: Record toggles to its recording state
+  at once; Save disables and shows "Saving"; Play swaps to "Playing"/active;
+  Export shows "Preparing your backup" and disables; Import shows "Restoring your
+  ideas"; Delete confirm disables; Add-tag / Save-notation disable while
+  pending. The `.btn:active` transform already gives a pressed cue; this budget
+  is about the *pending* state, not just the press.
+- **No hot-path degradation at scale:** rendering the first songbook page must
+  read at most one page (`DEFAULT_PAGE_SIZE`) regardless of corpus size; search
+  ranking over hundreds of contours stays well under the existing 500ms
+  guardrail. Neither reads audio blobs or notes into memory on the hot path.
 
-- `src/db/storage.ts`
-  - `export async function getStorageEstimate(): Promise<{ usageBytes: number | null; quotaBytes: number | null; entryCount: number }>`
-    — `navigator.storage.estimate()` when available (else nulls), plus
-    `countEntries()`. Never throws; degrade to `entryCount` only.
+### Accessibility contract (BINDING, per QUALITY BAR §6)
 
-- `src/components/SettingsScreen.tsx` — the Settings route (below).
-
-- `src/components/ImportPanel.tsx` — the drop zone + file picker + per-file
-  progress list, used on the capture screen. (May be inlined into
-  `CaptureScreen` if that reads cleaner; a component keeps `CaptureScreen`
-  focused.)
-
-**Modified modules**
-
-- `src/db/entries.ts`
-  - `export function putImportedEntry(entry: Entry): Promise<"imported" | "skipped">`
-    — validates `title`/`notationAbc`/`tags` and the presence of `audio`/`notes`,
-    then, in one `readwrite` transaction, checks whether `entry.id` already
-    exists: if so resolves `"skipped"` without writing; otherwise `put`s the
-    entry **preserving** `id`, `createdAt`, `updatedAt`, and `schemaVersion`, and
-    resolves `"imported"`. This is what makes repeated import idempotent.
-  - If `ValidationError` is moved to a shared module, keep a re-export here so
-    existing imports do not break.
-
-- `src/router/useHashRoute.ts` — add a `{ name: "settings" }` route and parse
-  `"/settings"`.
-
-- `src/App.tsx` — render `SettingsScreen` for the `settings` route.
-
-- `src/components/SongbookScreen.tsx` — add a subordinate **Settings** control
-  in the topbar (tap 1) so Export (tap 2, on the Settings screen) is reachable
-  in two taps. Keep "Hum to search" the single primary action; Settings is a
-  quiet link/icon, visibly subordinate.
-
-- `src/components/CaptureScreen.tsx` — surface the import affordance on the idle
-  capture screen (render `ImportPanel`), so a new user with a pile of memos can
-  fill the vault. Recording stays the primary action; import is subordinate.
-
-- `src/copy/strings.ts` — add all new strings (see Copy section).
-
-- `README.md` — document bulk import and backup/restore.
-
-- `package.json` — add `fflate`.
-
-### Zip layout (contract)
-
-```
-manifest.json
-entries/<id>/audio.<ext>
-entries/<id>/notation.musicxml
-entries/<id>/notation.mid
-```
-
-`manifest.json`:
-
-```json
-{
-  "format": "hum-vault-backup",
-  "version": 1,
-  "exportedAt": 1757900000000,
-  "entryCount": 2,
-  "entries": [
-    {
-      "id": "…", "title": "…", "tags": ["…"],
-      "createdAt": 0, "updatedAt": 0, "durationSec": 0,
-      "audioMimeType": "audio/webm", "schemaVersion": 1,
-      "notes": [ { "pitchMidi": 60, "startSec": 0, "durationSec": 0.5 } ],
-      "contour": { "version": 1, "noteCount": 0, "intervals": [], "ioiRatios": [] },
-      "notationAbc": "…",
-      "files": { "audio": "entries/…/audio.webm", "musicxml": "entries/…/notation.musicxml", "midi": "entries/…/notation.mid" }
-    }
-  ]
-}
-```
-
-### Privacy / security (QUALITY BAR §5, adapted to a client-only app)
-
-- No network I/O anywhere in this EPIC. Zip is built and downloaded locally;
-  import reads the chosen file locally. Audio never leaves the device.
-- Input validated at every boundary: dropped files (type + size before decode),
-  imported manifest and per-entry fields (types, sizes, array shapes) before any
-  DB write. Reuse the existing title/tag/notation limits.
-- No PII in logs. Follow the existing `listContours` precedent: log counts only,
-  never titles, notes, contours, or filenames.
-- No authenticated routes exist (client-only), so there is nothing to authorize
-  server-side; state this in the README privacy note, consistent with the
-  current one.
+- Exactly one `<h1>` per screen (fix `EntryDetailScreen`); `StatusMessage`
+  titles stay `<h2>` under the screen `<h1>`.
+- Each screen keeps its `<main>` landmark; the songbook top bar / nav controls
+  stay reachable and labeled.
+- Every interactive element has a visible focus indicator (already via
+  `:focus-visible`); the audit confirms none was removed and the file-input
+  labels keep their `focus-within` ring.
+- Error states use `role="alert"`; progress/success use `aria-live="polite"`.
+- `ConfirmDialog` traps focus while open, closes on Escape, and restores focus
+  to the trigger on close; it exposes `role="dialog"` + `aria-modal="true"` +
+  `aria-labelledby`. Verify and add whatever of this is missing.
+- Text/background contrast is at least 4.5:1 for normal text and 3:1 for large
+  text and UI borders; document the checked pairs (accent, muted, danger on
+  `--bg`/`--surface`). No hit is expected from the current palette; record the
+  ratios as proof.
+- Keyboard reaches every control a pointer can: record, example, save, play,
+  nav to songbook/search/settings, list rows, entry detail fields and actions,
+  tag add/remove, import file picker, export/import, dialog buttons.
 
 ---
 
 ## Ordered task list (with acceptance criteria)
 
-Each task's criteria are provable by the tests named in the Test plan.
+Each task's criteria are provable by the tests named in the Test plan. A
+criterion is met only when its test passes **and** the surface clears the
+quality bar.
 
-### T1. Boundary validation for imported audio
-Build `validateAudioFile` with the MIME/extension allowlist, size cap, and
-zero-byte guard.
-- **AC1.1** A file whose type is not in the allowlist (and whose extension is not
-  either) throws `ValidationError` with a clear, human message.
-- **AC1.2** A file over `MAX_IMPORT_BYTES` throws with a clear size message.
-- **AC1.3** A `.m4a` file reported with an empty `type` is accepted via its
-  extension.
-- **AC1.4** Validation runs and can reject **before** any decode call.
+### T1. Mobile-Safari / WebKit verification at 390px
 
-### T2. Deterministic MusicXML and MIDI exporters
-Build `notesToMusicXml` and `notesToMidi`.
-- **AC2.1** `notesToMusicXml` returns a well-formed `score-partwise` document
-  containing a `<note>` for each transcribed note; identical input yields an
-  identical string.
-- **AC2.2** `notesToMidi` returns bytes beginning with the `MThd` header and one
-  `MTrk` track, with a note-on/note-off pair per note; identical input yields
-  identical bytes.
-- **AC2.3** Both handle an empty `notes` array without throwing (valid empty
-  score / empty track).
+Add a WebKit Playwright project and a spec that runs the core flows at 390px on
+the WebKit engine, plus the Safari-safe recorder guarantee, plus a documented
+manual iOS-device mic check.
 
-### T3. Bulk import pipeline with per-file progress and failure isolation
-Build `importAudioFiles` and wire the existing `transcribe` `onProgress`.
-- **AC3.1** Importing N valid files saves N entries; each item reaches `"saved"`
-  and carries its `entryId`.
-- **AC3.2** Each item passes through visible states with a progress fraction
-  during `"reading"`; `onUpdate` fires on every transition.
-- **AC3.3** A batch containing one invalid file (bad type / oversize / empty
-  transcription) marks exactly that item `"skipped"` or `"failed"` with a message
-  and still saves every valid file. The batch never aborts on one failure.
-- **AC3.4** An imported entry's `contour` is computed by the same `saveEntry`
-  path as a live hum, so search treats it identically.
+- **AC1.1** `playwright.config.ts` defines a `mobile-safari` (WebKit) project at
+  a 390px-wide viewport, alongside the existing `desktop` project, and
+  `scripts/e2e.sh` runs it in the pinned container.
+- **AC1.2** `tests/e2e/mobile-safari.spec.ts`, running under WebKit at 390px,
+  verifies each of the five core flows works with no horizontal scroll:
+  capture-to-notation (via the example pipeline), save, hum-to-search returning
+  a ranked result, bulk import adds an entry, and export fires a `.zip`
+  download. Where full on-device model inference is not reliably runnable under
+  headless WebKit, the spec seeds a deterministic corpus (via `SEED_DEMO` or a
+  small IndexedDB seed) so save/list/search/import/export are proven in the
+  WebKit engine without depending on model timing; the model pipeline stays
+  proven under `desktop`. The chosen split is stated in a comment at the top of
+  the spec.
+- **AC1.3** Microphone capture negotiates a Safari-supported path: a test proves
+  `startRecording` produces a blob tagged with the actual `recorder.mimeType`
+  (not a hardcoded `audio/webm`) and, where the environment reports supported
+  types, prefers a Safari-supported type via `MediaRecorder.isTypeSupported`.
+  `getUserMedia` denial and no-mic still resolve to the designed `mic-denied` /
+  `no-mic` states under WebKit.
+- **AC1.4** A `VERIFICATION.md` at the worktree root documents the manual
+  physical-iPhone Safari check (open the deployed/staging URL on an iPhone, grant
+  the mic, hum, confirm draft notation, save, hum-to-search, import a memo,
+  export), stating plainly that a real iOS device is outside CI and this is the
+  human step that closes AC "confirmed on iOS Safari specifically". The automated
+  WebKit run (AC1.2/AC1.3) is the CI-provable proxy for the same engine.
 
-### T4. Full vault export
-Build `buildVaultZip` / `downloadVaultZip` and the mime→extension map.
-- **AC4.1** The zip contains `manifest.json` plus, per entry, an audio file, a
-  `notation.musicxml`, and a `notation.mid` under `entries/<id>/`.
-- **AC4.2** The manifest lists every entry with title, tags, and timestamps
-  (and the fields import needs).
-- **AC4.3** Export reads the entire corpus by paging, not just the search
-  backstop; a corpus larger than one page still exports fully.
+### T2. Perceived speed: immediate feedback and no hot-path degradation
 
-### T5. Vault re-import with dedup
-Build `importVaultZip` and `putImportedEntry`.
-- **AC5.1** Importing a zip produced by T4 restores each entry with matching
-  `notes`, recomputed-and-equal `contour`, `tags`, `notationAbc`, `title`,
-  `createdAt`, and audio bytes/mime.
-- **AC5.2** Importing the same zip a second time adds nothing new: every entry
-  is reported `skipped`, and the total entry count is unchanged.
-- **AC5.3** A zip missing `manifest.json`, or with an unknown `format`/`version`,
-  or that is not a zip, fails with a clear message and writes nothing.
-- **AC5.4** One entry with a missing audio file or invalid fields is counted
-  `failed` while the other entries still import.
+- **AC2.1** Every control that starts async work enters its pending/pressed
+  state synchronously with the triggering event: a component test asserts the
+  control is disabled or shows its pending label in the same tick the action is
+  dispatched, before the underlying promise resolves. Covered controls: Save,
+  Play, Export, Import, Delete confirm, Add tag, Save notation, the Record
+  toggle, and the songbook **Show more** control (which currently disables
+  without a pending label or cue and must show an in-place pending state).
+- **AC2.2** Rendering the first songbook page reads at most one page from
+  IndexedDB regardless of corpus size: a test seeds several hundred entries and
+  asserts the initial `listEntries` reads `DEFAULT_PAGE_SIZE` rows and returns a
+  non-null `nextBefore`, and that the render does not load audio/notes for
+  off-page rows.
+- **AC2.3** Search ranking over several hundred contours stays well under the
+  documented budget (reuse/extend the existing sub-500ms guardrail) and reads
+  only `{ id, title, contour }` per entry.
 
-### T6. Settings screen: storage usage + export + import (two-tap export)
-Build `SettingsScreen`, the `/settings` route, and the songbook link.
-- **AC6.1** From the songbook, Settings opens in one tap and Export runs in the
-  next (two taps total).
-- **AC6.2** Settings shows storage usage (used space when
-  `navigator.storage.estimate` is available) and the entry count; it degrades to
-  the entry count alone when the API is missing, without error.
-- **AC6.3** Settings hosts Export (downloads the zip) and Import (accepts a zip
-  and shows the imported/skipped/failed summary).
-- **AC6.4** Export, import, and storage read each have designed idle, working,
-  done, and error states. No white screen, no raw error text.
+### T3. Designed empty / loading / error states on every screen
 
-### T7. Capture-screen import affordance
-Render `ImportPanel` on the idle capture screen.
-- **AC7.1** The idle capture screen shows a discoverable way to add existing
-  audio files, with a **file input** (mobile baseline) and a **drop target**
-  (desktop enhancement). Recording remains the primary action.
-- **AC7.2** Dropping or choosing files shows the per-file progress list from T3.
+- **AC3.1** For each screen (capture, songbook, search, entry detail, settings,
+  import panel) a test asserts its **empty**, **loading**, and **error** states
+  render a designed surface: a heading, a body, and (where an action makes
+  sense) a next-step control. Loading holds layout with a skeleton or an
+  in-place spinner, never a blank region.
+- **AC3.2** No error path surfaces a raw `Error.message`, error code, or stack:
+  a test forces each screen's failure path (DB open failure, transcription
+  failure, save failure, export/import failure, entry-not-found, search failure)
+  and asserts the visible copy is the corresponding designed string from
+  `src/copy/strings.ts`, not the thrown error's text.
 
-### T8. Copy, README, and quality-bar pass
-- **AC8.1** Every new user-visible string is in `src/copy/strings.ts` and the
-  copy sweep (`tests/copy.test.ts`) passes: no em/en dashes, no banned
-  vocabulary, no negative empty-state phrasing.
-- **AC8.2** The README documents bulk import and backup/restore with accurate
-  steps, and the README copy sweep still passes.
-- **AC8.3** All new surfaces are usable at 390px with no horizontal scroll,
-  ~44px touch targets, labeled inputs, and visible focus states.
+### T4. Search ranking measured against the fixed fixture
+
+- **AC4.1** `tests/search.test.ts` remains the documented measure of the top-3
+  bar: a genuine transposed, tempo-scaled, slightly-imperfect fragment of a
+  corpus melody ranks its entry in the top 3 (strong form: #1 for the exact
+  case), and an unrelated query returns no match. This stays green.
+- **AC4.2** Any tuning of `RHYTHM_WEIGHT`, `DEFAULT_MAX_SCORE`,
+  `MIN_QUERY_STEPS`, or `DEFAULT_LIMIT` is justified by the fixture: the fixture
+  is what proves a changed constant is right. No new public function, option, or
+  index is added to `src/melody/search.ts`; its exported API is unchanged.
+- **AC4.3** The top-3 bar and the fixture as its source of truth are documented
+  (a short line in `README.md` under search, and referenced in this spec), so a
+  stranger and a future agent know the recall claim is measured, not asserted.
+
+### T5. Accessibility basics
+
+- **AC5.1** Every screen exposes exactly one `<h1>` and keeps its `<main>`
+  landmark, in every phase: fix `EntryDetailScreen` (no `<h1>` today) and
+  `SearchScreen`'s non-results phases (loading, empty-corpus, transcribing,
+  no-match, no-notes, error render only a `StatusMessage` `<h2>`). A test queries
+  the top-level heading and the main landmark per screen and per state.
+- **AC5.2** Error surfaces use `role="alert"`; progress/success use
+  `aria-live="polite"`: a test asserts the tone-to-role mapping on
+  `StatusMessage` and on the capture/settings inline error and success lines.
+- **AC5.3** `ConfirmDialog` is `role="dialog"` + `aria-modal="true"` +
+  `aria-labelledby`, traps focus while open, closes on Escape, and restores
+  focus to the trigger on close: a test drives open, Tab-cycle containment,
+  Escape-to-close, and focus restoration.
+- **AC5.4** Every input is labeled and every control is keyboard-reachable and
+  operable: a test walks each screen's controls by role/name and confirms the
+  file-input labels keep a focus indicator. Documented contrast ratios for the
+  accent, muted, and danger colors on `--bg` and `--surface` are recorded and
+  each meets its threshold; any control below ~44px is fixed.
+- **AC5.5** Toggle controls expose their state to assistive tech: the Play
+  controls (`EntryRow`, `NotationView`) and the Record button carry
+  `aria-pressed` reflecting active/recording, not just a class and label swap. If
+  cheap, the `Walkthrough` step chip announces step changes (an `aria-live`
+  region) and the `TagEditor` group uses a semantic label rather than a styled
+  `<span>`. These are announce-only refinements and add no visible surface.
+
+### T6. Full human-voice copy sweep across every screen
+
+- **AC6.1** `tests/copy.test.ts` passes over every string in
+  `src/copy/strings.ts`, the demo titles, `README.md`, and `.env.example`: no
+  em-dash or en-dash, no banned LLM vocabulary, no negative empty-state phrasing.
+- **AC6.2** No user-visible string bypasses `src/copy/strings.ts`: an audit of
+  every component confirms rendered user-facing text is pulled from `strings`
+  (interpolated via `fill` where counts appear), and any stray literal found is
+  moved into `strings.ts` and swept. Code comments and non-UI strings are
+  exempt.
+
+### T7. README for strangers
+
+- **AC7.1** A stranger can understand the app in the first two or three
+  sentences (what it is, that audio stays on-device, that it searches your own
+  hums by melody). No App Factory paths, agents, task types, or internal
+  services appear anywhere in the README.
+- **AC7.2** The run instructions are verified against the actual files: the
+  local commands match `package.json` scripts, and the Docker / compose commands
+  match `Dockerfile` and `docker-compose.staging.yml`. `scripts/check-staging.sh`
+  is referenced accurately. Any drift between README and the real files is fixed.
+- **AC7.3** The contribute section points at where the code lives (the
+  `src/` layout) and how to run the tests (`npm test`, `bash scripts/e2e.sh`),
+  and the README copy sweep (AC6.1) stays green.
 
 ---
 
 ## Quality bar mapping (BINDING)
 
-- **Perceived speed (§1):** per-file rows appear within 100 ms of a drop/choose;
-  progress updates continuously during transcription; export and import show
-  in-place progress; the Settings storage read shows a placeholder then a value.
-  Export pages the corpus (no unbounded synchronous scan on the hot path).
-- **Mobile-first (§2):** file input is the baseline path (mobile browsers have no
-  drag-and-drop); drag-drop is the desktop enhancement. Everything works and
-  fits at 390px.
-- **Designed states (§3):** import panel has an idle prompt, per-file progress,
-  and per-file error rows plus a batch summary; export/import each have
-  idle/working/done/error; Settings has a loading placeholder for storage.
-- **First-run (§4):** unchanged core onboarding (owned elsewhere). The import
-  affordance on the idle capture screen makes the cold-start path discoverable
-  in one short line. No new walkthrough here.
-- **Security hygiene (§5):** as in the Privacy/security section. Client-only,
-  boundary validation everywhere, counts-only logging.
-- **Accessibility (§6):** every new input labeled; drop zone reachable and
-  operable by keyboard via its file input; visible focus; sufficient contrast.
-- **Radically simple (§7):** one primary action per screen (capture: Record;
-  songbook: Hum to search; settings: Export). Import, drop zone, and Settings
-  link are visibly subordinate. Short labels, a real filename as the default
-  title, no instruction paragraphs.
-- **Copy (§8):** all strings centralized and swept (T8).
-- **README (§9):** import/backup documented for strangers.
-
----
-
-## Copy (draft strings, pre-swept — add to `src/copy/strings.ts`)
-
-Sweep every one of these before shipping (no `—`/`–`, no banned words, positive
-phrasing). Suggested `strings` additions:
-
-```
-import: {
-  heading: "Add from files",
-  hint: "Drop voice memos here, or choose files.",
-  choose: "Choose files",
-  reading: "Reading",        // shown with the per-file progress
-  decoding: "Opening",
-  saved: "Saved",
-  batchDone: "Added {n} of {total}.",   // fill n/total at render
-  skippedType: "Hum Vault reads audio recordings. Choose an mp3, m4a, wav, or webm file.",
-  skippedSize: "This file is over 25 MB. Choose a shorter recording.",
-  skippedEmpty: "Try a file with one steady hum, then add it again.",
-  failed: "This file did not open. Try another one.",
-},
-settings: {
-  heading: "Settings",
-  storageHeading: "Storage",
-  storageUsed: "{used} used",           // e.g. "12 MB used"
-  entryCount: "{n} ideas saved",
-  export: "Export backup",
-  exporting: "Preparing your backup",
-  exportDone: "Backup downloaded.",
-  exportError: { title: "Try the export again", body: "The backup did not finish. Try once more.", action: "Try again" },
-  import: "Import backup",
-  importing: "Restoring your ideas",
-  importDone: "Restored {imported}. Skipped {skipped}.",  // fill counts
-  importError: { title: "Choose a Hum Vault backup", body: "This is not a backup file. Choose a backup zip you exported here.", action: "Try again" },
-},
-nav: { settings: "Settings" }  // add alongside existing nav strings
-```
-
-These are drafts. The implementer may reword for their exact UI as long as the
-sweep still passes and phrasing stays positive and short. Numbers/counts are
-interpolated at render, not baked into the constant.
+- **Perceived speed (§1):** T2 — synchronous pending states on every async
+  control; first songbook page reads one page; search stays under budget at
+  hundreds of entries.
+- **Mobile-first (§2):** T1 — the five core flows verified on WebKit at 390px
+  with no horizontal scroll; T5 keeps touch targets ~44px.
+- **Designed states (§3):** T3 — empty/loading/error designed on every screen,
+  no raw errors, no dead ends.
+- **First-run (§4):** unchanged. The delivered walkthrough and `SEED_DEMO` demo
+  own first-run; this EPIC only verifies their states clear the bar (T3) and
+  does not touch their behavior. No new walkthrough.
+- **Security hygiene (§5):** client-only, no new routes, no network I/O; input
+  is still validated at the storage boundary (unchanged). No PII in logs is
+  preserved (the count-only `listContours` log stays count-only). This EPIC adds
+  no logging.
+- **Accessibility (§6):** T5 — one `<h1>` and a `<main>` per screen, labeled
+  controls, visible focus, assertive error announcement, focus-trapped dialog,
+  documented contrast, full keyboard reach.
+- **Radically simple (§7):** unchanged surface. No control, word, or screen is
+  added; the copy sweep (T6) keeps labels short and positive.
+- **Copy (§8):** T6 — full sweep across every screen and the README, no string
+  bypassing `strings.ts`.
+- **README (§9):** T7 — understand / run / contribute, verified against the real
+  files, no pipeline jargon.
 
 ---
 
 ## Test plan
 
-Tests use the existing infra: Vitest + jsdom + `fake-indexeddb` (each test file
-resets the DB per the current `tests/setup.ts`), Testing Library for components,
-and the pinned Playwright container (`scripts/e2e.sh`) for end-to-end. `fflate`
-runs under jsdom, so zip round-trips are unit-testable without a browser.
+Tests use the existing infra: Vitest + jsdom + `fake-indexeddb` (each file
+resets the DB via `tests/setup.ts`), Testing Library for components, and the
+pinned Playwright container (`scripts/e2e.sh`) for end-to-end, now across a
+`desktop` (Chromium) and a `mobile-safari` (WebKit) project.
 
-### Unit
+### Unit / component
 
-- `tests/validateAudioFile.test.ts` (T1): a table of accepted MIME types,
-  accepted-by-extension `.m4a` with empty type, rejected type, oversize, and
-  zero-byte. Proves AC1.1–AC1.4.
-- `tests/musicXml.test.ts` (T2): a fixed `NoteEvent[]` yields a stable string
-  containing one `<note>` per note and parses as XML; empty input yields a valid
-  empty score. Proves AC2.1, AC2.3.
-- `tests/midi.test.ts` (T2): output starts with `MThd`, contains one `MTrk`, has
-  the expected note-on/note-off count, and is byte-stable across runs; empty
-  input is handled. Proves AC2.2, AC2.3.
-- `tests/exportVault.test.ts` (T4): save several entries, `buildVaultZip`,
-  `unzip`, and assert `manifest.json` plus per-entry audio/musicxml/midi paths;
-  seed more than one page and assert every entry is present. Proves AC4.1–AC4.3.
-- `tests/importVault.test.ts` (T5): round-trip (export → clear DB → import) and
-  assert restored `notes`, `contour` (equal to a fresh `computeContour(notes)`),
-  `tags`, `notationAbc`, `title`, `createdAt`, and audio byte length/mime;
-  import the same zip twice and assert the count is unchanged and all `skipped`;
-  feed a non-zip / a zip without a manifest / an unknown version and assert a
-  thrown clear error with no writes; corrupt one entry's audio path and assert it
-  is `failed` while others import. Proves AC5.1–AC5.4.
-- `tests/entries.test.ts` (extend, T5): `putImportedEntry` preserves `id`,
-  `createdAt`, `updatedAt`, and returns `"skipped"` for an existing `id`.
-- `tests/importAudioFiles.test.ts` (T3): with `decodeToMono22050` and
-  `transcribe` mocked, importing three files where one throws yields two `saved`
-  and one `skipped`/`failed`, `onUpdate` fires per transition, and progress
-  reaches 1 for saved files. Proves AC3.1–AC3.3. AC3.4 is covered by asserting a
-  saved import produces the same contour as the direct `saveEntry` path for the
-  same notes.
+- `tests/recorder.test.ts` (T1): with `MediaRecorder` and `getUserMedia`
+  stubbed, `startRecording` produces a blob tagged with the actual
+  `recorder.mimeType`; when supported types are reported it prefers a
+  Safari-supported type; denial maps to `mic-denied` and no track maps to
+  `no-mic`. Proves AC1.3.
+- `tests/perfHotPaths.test.ts` (T2): seed several hundred entries; assert the
+  first `listEntries` returns exactly `DEFAULT_PAGE_SIZE` rows with a non-null
+  `nextBefore`; assert `listContours` returns rows carrying only
+  `{ id, title, contour }`; time `rankMatches` over the seeded corpus under the
+  documented budget. Proves AC2.2, AC2.3.
+- Component tests (T2, T3, T5), extended in place:
+  - `captureScreen.test.tsx`: Save/Play/Record show a synchronous pending or
+    pressed state before the promise resolves (AC2.1); mic-denied, no-mic,
+    empty-result, transcribe-error, and save-error render the designed strings,
+    not raw text (AC3.1, AC3.2); inline error lines are `role="alert"`, success
+    is `role="status"` (AC5.2).
+  - `songbookScreen.test.tsx`: empty, loading (skeleton), and error states are
+    designed (AC3.1, AC3.2); the list renders one page and a "Show more" control
+    when more exist (AC2.2 at the component level).
+  - `searchScreen.test.tsx`: no-match, no-notes, empty-corpus, and error states
+    are designed (AC3.1, AC3.2); the results heading is the screen `<h1>`
+    (AC5.1); Play swaps to its active label synchronously (AC2.1).
+  - `entryDetail.test.tsx`: the screen exposes one `<h1>` (AC5.1); entry-not-found
+    is designed (AC3.1); Save-notation and Add-tag disable while pending (AC2.1).
+  - `settingsScreen.test.tsx`: storage-loading placeholder, export/import
+    idle/working/done/error states are designed and export/import show a
+    synchronous pending label (AC2.1, AC3.1, AC3.2); export error is
+    `role="alert"` (AC5.2).
+  - `importPanel.test.tsx`: per-file rows appear synchronously on choose/drop and
+    reflect saved/skipped/failed with designed messages (AC2.1, AC3.1).
+  - a shared `confirmDialog` test (extend `entryDetail.test.tsx` or add
+    `tests/confirmDialog.test.tsx`): `role="dialog"`, `aria-modal`, focus trap,
+    Escape-to-close, focus restore (AC5.3).
+- `tests/search.test.ts` (T4, existing): the documented top-3 fixture stays
+  green; the matcher's exported API is unchanged. Proves AC4.1, AC4.2.
+- `tests/copy.test.ts` (T6, existing + extended): sweeps `strings`, demo titles,
+  README, `.env.example`; add a guard/audit note that user-visible literals live
+  in `strings.ts`. Proves AC6.1, AC6.2.
 
-### Component
+### End-to-end
 
-- `tests/settingsScreen.test.tsx` (T6): renders storage usage from a mocked
-  `getStorageEstimate`, falls back to entry count when estimate returns nulls,
-  triggers `buildVaultZip` on Export (mock the download), and shows the
-  imported/skipped summary on Import. Proves AC6.2–AC6.4.
-- `tests/importPanel.test.tsx` (T7): choosing files renders per-file rows and
-  reflects saved/failed states (pipeline mocked). Proves AC7.1–AC7.2.
-- `tests/copy.test.ts` (existing, T8): automatically scans the new `strings`
-  entries; add nothing but the strings themselves. Proves AC8.1.
+- `tests/e2e/mobile-safari.spec.ts` (T1), WebKit at 390px: the five core flows
+  with no horizontal scroll, seeding a deterministic corpus where model inference
+  is not reliable under headless WebKit (rationale in a header comment). Proves
+  AC1.1, AC1.2. The existing `desktop` specs continue to prove the full model
+  pipeline (capture-to-notation, save, hum-to-search) under Chromium at 390px.
+- The a11y keyboard-reach walk (AC5.4) is covered at the component level by
+  role/name queries; an optional e2e keyboard pass may reinforce it but is not
+  required to prove the criterion.
 
-### End-to-end (`tests/e2e/backup.spec.ts`, at 390px)
+### Manual (documented, non-CI)
 
-- Import: from the capture screen, use the file input to add the bundled sample
-  (`tests/fixtures/simple-hum.wav`) and confirm a new songbook entry appears; no
-  horizontal scroll. (Proves AC3.1/AC7 in a real browser.)
-- Two-tap export: from the songbook, open Settings (tap 1), Export (tap 2), and
-  assert a `.zip` download event fires. (Proves AC6.1, AC4.)
-- Round-trip: import that downloaded zip back in a fresh context and assert the
-  entry is restored; import it again and assert no duplicate row appears.
-  (Proves AC5.1–AC5.2.) If driving a downloaded file back through the file
-  chooser is impractical in the container, cover the round-trip in
-  `importVault.test.ts` (unit) and keep the e2e to import-file + export-download.
+- `VERIFICATION.md` (T1): the physical-iPhone Safari checklist for the mic path,
+  explicitly flagged as outside CI. This documents the human step that closes
+  "microphone capture confirmed on iOS Safari specifically"; the WebKit e2e is
+  the automatable engine-level proxy.
 
-A criterion is met only when its test passes **and** the surface clears the
-quality bar above (mobile layout, designed states, swept copy).
+A criterion is met only when its automated test passes **and** the surface
+clears the quality bar (mobile layout, designed states, accessible, swept copy).
 
 ---
 
 ## Open decisions resolved (so the implementer does not have to ask)
 
-- **Derived-file source:** `notes`, not `notationAbc` (see Data model).
-- **Contour on import:** recomputed from `notes`, manifest copy is informational.
-- **Dedup key:** entry `id`; repeated import is idempotent via `putImportedEntry`.
-- **Concurrency:** import files sequentially.
-- **Caps:** 25 MB/file; 120 s decoded duration/file; export pages the full
-  corpus (no cap).
-- **Two taps:** Songbook → Settings → Export.
-- **No DB migration:** existing v1 schema suffices.
-- **`persist()` and eviction UX:** out of scope (deferred).
+- **iOS Safari mic verification:** WebKit at 390px is the CI-provable engine
+  proxy (AC1.2/AC1.3); a real iPhone check is documented in `VERIFICATION.md`
+  (AC1.4). Do not attempt to fake a live iOS device in CI.
+- **WebKit + model inference:** if headless-WebKit on-device inference is flaky
+  or too slow, seed a deterministic corpus for the WebKit flows and keep the
+  full model pipeline proven under Chromium; state the split in the spec header
+  comment. This is a test decision, not a product change.
+- **Error announcement:** error tone uses `role="alert"`; info/progress uses
+  `aria-live="polite"`. This is the only `StatusMessage` change and it adds no
+  prop.
+- **EntryDetail heading:** add exactly one `<h1>` (visible title or
+  visually-hidden), no new control.
+- **Recorder mime:** prefer a Safari-supported type via `isTypeSupported`, keep
+  tagging the blob with `recorder.mimeType`; leave the default path if WebKit
+  already produces a decodable blob and only add the test.
+- **Search tuning:** allowed only inside `src/melody/search.ts`'s existing
+  constants, proven by the fixture; the exported API is frozen.
+- **No new dependency, no schema change, no new user-facing surface.**
