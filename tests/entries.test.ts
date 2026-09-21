@@ -68,6 +68,16 @@ describe("saveEntry / getEntry", () => {
   it("returns undefined for a missing id", async () => {
     expect(await getEntry("does-not-exist")).toBeUndefined();
   });
+
+  it("persists isDemo only when it is passed", async () => {
+    const demo = await saveEntry(makeInput({ isDemo: true }));
+    expect(demo.isDemo).toBe(true);
+    expect((await getEntry(demo.id))!.isDemo).toBe(true);
+
+    const real = await saveEntry(makeInput());
+    expect(real.isDemo).toBeUndefined();
+    expect((await getEntry(real.id))!.isDemo).toBeUndefined();
+  });
 });
 
 describe("listEntries", () => {

@@ -8,6 +8,7 @@ import { estimateMelodyMs } from "../melody/duration";
 import { navigate } from "../router/useHashRoute";
 import EntryRow from "./EntryRow";
 import StatusMessage from "./StatusMessage";
+import Walkthrough from "./Walkthrough";
 
 type LoadState = "loading" | "loaded" | "error";
 
@@ -130,6 +131,8 @@ export default function SongbookScreen() {
       </header>
 
       <div className="screen__body">
+        <Walkthrough />
+
         {state === "loading" && <SongbookSkeleton />}
 
         {state === "error" && (

@@ -6,6 +6,7 @@ import {
   DB_VERSION,
   ENTRY_SCHEMA_VERSION,
   ENTRY_STORE,
+  META_STORE,
   type Entry,
   type SearchCandidate,
 } from "./schema";
@@ -38,7 +39,9 @@ export class ValidationError extends Error {
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
-function openDb(): Promise<IDBDatabase> {
+// Exported so the meta store (src/db/meta.ts) reuses this single cached
+// connection rather than opening a second one against the same database.
+export function openDb(): Promise<IDBDatabase> {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
     let request: IDBOpenDBRequest;
@@ -51,9 +54,15 @@ function openDb(): Promise<IDBDatabase> {
     }
     request.onupgradeneeded = () => {
       const db = request.result;
+      // v1: the entries store and its newest-first index.
       if (!db.objectStoreNames.contains(ENTRY_STORE)) {
         const store = db.createObjectStore(ENTRY_STORE, { keyPath: "id" });
         store.createIndex(CREATED_AT_INDEX, "createdAt", { unique: false });
+      }
+      // v2: a small key/value store for app flags. Additive; the entries store
+      // and every saved record are left untouched.
+      if (!db.objectStoreNames.contains(META_STORE)) {
+        db.createObjectStore(META_STORE, { keyPath: "key" });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -137,6 +146,7 @@ export function saveEntry(input: {
   notationAbc: string;
   title: string;
   tags: string[];
+  isDemo?: boolean;
 }): Promise<Entry> {
   // Validate at the boundary before touching the database.
   let entry: Entry;
@@ -160,6 +170,8 @@ export function saveEntry(input: {
       notationAbc,
       tags,
       schemaVersion: ENTRY_SCHEMA_VERSION,
+      // Absent on real entries; set only when seeding demo ideas.
+      ...(input.isDemo ? { isDemo: true } : {}),
     };
   } catch (err) {
     return Promise.reject(err);

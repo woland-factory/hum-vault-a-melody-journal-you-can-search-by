@@ -429,12 +429,32 @@ body {
   border-radius: 8px;
 }
 
+.entry-row__titleline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .entry-row__title {
   font-weight: 600;
   font-size: 1.05rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A quiet marker for a seeded sample, subordinate to the title. */
+.entry-row__badge {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 2px 8px;
 }
 
 .entry-row__date {
@@ -796,8 +816,64 @@ body {
 }
 
 .settings__export,
-.settings__import {
+.settings__import,
+.settings__clear-demo {
   align-self: stretch;
+}
+
+/* Guided first run: a compact, non-modal chip above the screen's controls. */
+.walkthrough {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface-2);
+  border: 1px solid #33415580;
+  border-radius: var(--radius);
+  padding: 10px 12px 10px 16px;
+}
+
+.walkthrough__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.walkthrough__progress {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.walkthrough__label {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.walkthrough__skip {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 600;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.walkthrough__skip:hover {
+  color: var(--text);
+}
+
+.walkthrough__skip:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* Confirm dialog */

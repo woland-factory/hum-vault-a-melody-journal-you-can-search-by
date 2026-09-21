@@ -82,6 +82,23 @@ export const strings = {
     failed: "This file did not open. Try another one.",
   },
 
+  onboarding: {
+    step1: "Record a hum.",
+    step2: "Save it to your songbook.",
+    step3: "Hum to find it again.",
+    progress: "Step {n} of 3", // n filled at render
+    skip: "Skip",
+  },
+
+  demo: {
+    heading: "Sample ideas",
+    badge: "Sample",
+    clear: "Clear demo ideas",
+    clearing: "Clearing",
+    cleared: "Demo ideas cleared.",
+    hint: "These sample ideas show how search works. Remove them whenever you like.",
+  },
+
   settings: {
     heading: "Settings",
     storageHeading: "Storage",

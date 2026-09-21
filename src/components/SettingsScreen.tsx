@@ -3,6 +3,7 @@ import { strings, fill } from "../copy/strings";
 import { getStorageEstimate } from "../db/storage";
 import { buildVaultZip, downloadVaultZip } from "../export/exportVault";
 import { importVaultZip, type VaultImportResult } from "../import/importVault";
+import { clearDemoEntries, hasDemoEntries } from "../demo/seedDemo";
 import { navigate } from "../router/useHashRoute";
 import StatusMessage from "./StatusMessage";
 
@@ -31,6 +32,8 @@ export default function SettingsScreen() {
   const [importState, setImportState] = useState<WorkState>("idle");
   const [importProgress, setImportProgress] = useState<[number, number] | null>(null);
   const [importResult, setImportResult] = useState<VaultImportResult | null>(null);
+  const [hasDemo, setHasDemo] = useState(false);
+  const [clearState, setClearState] = useState<WorkState>("idle");
 
   const refreshStorage = useCallback(() => {
     // getStorageEstimate never throws; it degrades to the entry count.
@@ -39,9 +42,30 @@ export default function SettingsScreen() {
     );
   }, []);
 
+  const refreshDemo = useCallback(() => {
+    void hasDemoEntries()
+      .then(setHasDemo)
+      .catch(() => setHasDemo(false));
+  }, []);
+
   useEffect(() => {
     refreshStorage();
-  }, [refreshStorage]);
+    refreshDemo();
+  }, [refreshStorage, refreshDemo]);
+
+  const handleClearDemo = useCallback(async () => {
+    setClearState("working");
+    try {
+      await clearDemoEntries();
+      setClearState("done");
+      refreshStorage();
+      refreshDemo();
+    } catch {
+      // Clearing is a local delete and rarely fails. Return to idle so the
+      // control stays available rather than showing raw error text.
+      setClearState("idle");
+    }
+  }, [refreshStorage, refreshDemo]);
 
   const handleExport = useCallback(async () => {
     setExportState("working");
@@ -193,6 +217,34 @@ export default function SettingsScreen() {
             </>
           )}
         </section>
+
+        {(hasDemo || clearState === "done") && (
+          <section className="settings__section" aria-label={strings.demo.heading}>
+            <h2 className="settings__heading">{strings.demo.heading}</h2>
+            {hasDemo && (
+              <>
+                <p className="settings__line settings__line--muted">
+                  {strings.demo.hint}
+                </p>
+                <button
+                  type="button"
+                  className="btn btn--secondary settings__clear-demo"
+                  onClick={() => void handleClearDemo()}
+                  disabled={clearState === "working"}
+                >
+                  {clearState === "working"
+                    ? strings.demo.clearing
+                    : strings.demo.clear}
+                </button>
+              </>
+            )}
+            {clearState === "done" && (
+              <p className="settings__line settings__done" role="status">
+                {strings.demo.cleared}
+              </p>
+            )}
+          </section>
+        )}
       </div>
     </main>
   );

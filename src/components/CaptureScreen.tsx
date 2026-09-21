@@ -18,6 +18,8 @@ import RecordButton from "./RecordButton";
 import NotationView from "./NotationView";
 import StatusMessage from "./StatusMessage";
 import ImportPanel from "./ImportPanel";
+import Walkthrough from "./Walkthrough";
+import { useOnboarding } from "../onboarding/OnboardingContext";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -51,6 +53,7 @@ export default function CaptureScreen() {
   const [playbackError, setPlaybackError] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [entryCount, setEntryCount] = useState<number | null>(null);
+  const { markDraftReady, markSaved } = useOnboarding();
 
   const recordingRef = useRef<Recording | null>(null);
   const visualObjRef = useRef<VisualObj | null>(null);
@@ -72,6 +75,17 @@ export default function CaptureScreen() {
         /* transcription will surface its own error if it is actually used */
       });
   }, []);
+
+  // Advance the guide as the draft appears and as a save succeeds. These read
+  // from the phase/saveState the screen already tracks, so the guide follows
+  // whether the draft came from a recording or the example.
+  useEffect(() => {
+    if (phase === "ready") markDraftReady();
+  }, [phase, markDraftReady]);
+
+  useEffect(() => {
+    if (saveState === "saved") markSaved();
+  }, [saveState, markSaved]);
 
   // Show how many ideas are already saved so the Songbook link is meaningful.
   // Refreshes whenever we return to the idle screen or finish a save.
@@ -259,6 +273,8 @@ export default function CaptureScreen() {
       </header>
 
       <div className="screen__body">
+        <Walkthrough />
+
         {(phase === "idle" ||
           phase === "requesting-mic" ||
           phase === "recording") && (

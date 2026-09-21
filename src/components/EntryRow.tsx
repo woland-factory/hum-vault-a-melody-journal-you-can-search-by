@@ -16,7 +16,12 @@ export default function EntryRow({ entry, playing, onPlay, onOpen }: EntryRowPro
   return (
     <li className="entry-row">
       <button type="button" className="entry-row__open" onClick={onOpen}>
-        <span className="entry-row__title">{entry.title}</span>
+        <span className="entry-row__titleline">
+          <span className="entry-row__title">{entry.title}</span>
+          {entry.isDemo && (
+            <span className="entry-row__badge">{strings.demo.badge}</span>
+          )}
+        </span>
         <span className="entry-row__date">{formatEntryDate(entry.createdAt)}</span>
         {entry.tags.length > 0 && (
           <span className="entry-row__tags">

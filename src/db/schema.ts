@@ -8,10 +8,15 @@ import type { NoteEvent } from "../transcribe/types";
 // rewrite existing records. Each record carries schemaVersion, and each contour
 // carries contour.version, so later code can detect and upgrade old records in
 // place without losing anything the user saved.
+//
+// v2 adds the `meta` object store for small app flags (first-run and demo-seed
+// state). The step is additive: it creates `meta` when missing and never
+// touches the `entries` store or any saved record.
 
 export const DB_NAME = "humvault";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 export const ENTRY_STORE = "entries";
+export const META_STORE = "meta";
 export const CREATED_AT_INDEX = "byCreatedAt";
 export const ENTRY_SCHEMA_VERSION = 1; // per-record schema version
 export const CONTOUR_VERSION = 1; // contour algorithm version
@@ -48,4 +53,5 @@ export interface Entry {
   notationAbc: string; // editable draft ABC (from notesToAbc, then user edits)
   tags: string[];
   schemaVersion: number; // ENTRY_SCHEMA_VERSION at save time
+  isDemo?: boolean; // true only on seeded demo entries; absent on real ones
 }

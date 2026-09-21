@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
 import { strings } from "../src/copy/strings";
+import { DEMO_CLIPS } from "../src/demo/demoData";
 
 function flatten(obj: unknown, out: string[] = []): string[] {
   if (typeof obj === "string") out.push(obj);
@@ -73,4 +74,10 @@ describe("copy sweep", () => {
     expect(env.includes("—")).toBe(false);
     expect(env.includes("–")).toBe(false);
   });
+
+  for (const clip of DEMO_CLIPS) {
+    it(`demo title is clean: "${clip.title}"`, () => {
+      expect(offenders(clip.title)).toEqual([]);
+    });
+  }
 });

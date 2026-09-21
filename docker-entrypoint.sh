@@ -15,7 +15,8 @@ cat > "$TARGET" <<EOF
 window.__HUMVAULT_ENV__ = {
   SENTRY_DSN: "$(escape "${SENTRY_DSN:-}")",
   UMAMI_WEBSITE_ID: "$(escape "${UMAMI_WEBSITE_ID:-}")",
-  UMAMI_URL: "$(escape "${UMAMI_URL:-}")"
+  UMAMI_URL: "$(escape "${UMAMI_URL:-}")",
+  SEED_DEMO: "$(escape "${SEED_DEMO:-}")"
 };
 EOF
 

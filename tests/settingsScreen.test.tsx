@@ -17,10 +17,16 @@ vi.mock("../src/import/importVault", () => ({
   importVaultZip: vi.fn(),
 }));
 
+vi.mock("../src/demo/seedDemo", () => ({
+  hasDemoEntries: vi.fn(),
+  clearDemoEntries: vi.fn(),
+}));
+
 import SettingsScreen from "../src/components/SettingsScreen";
 import { getStorageEstimate } from "../src/db/storage";
 import { buildVaultZip, downloadVaultZip } from "../src/export/exportVault";
 import { importVaultZip } from "../src/import/importVault";
+import { hasDemoEntries, clearDemoEntries } from "../src/demo/seedDemo";
 
 function backupFile(): File {
   return new NodeFile([new Uint8Array([1, 2, 3])], "backup.zip", {
@@ -39,6 +45,8 @@ beforeEach(() => {
   vi.mocked(importVaultZip)
     .mockReset()
     .mockResolvedValue({ imported: 2, skipped: 1, failed: 0, total: 3 });
+  vi.mocked(hasDemoEntries).mockReset().mockResolvedValue(false);
+  vi.mocked(clearDemoEntries).mockReset().mockResolvedValue(0);
   window.location.hash = "";
 });
 
@@ -135,5 +143,37 @@ describe("SettingsScreen", () => {
     render(<SettingsScreen />);
     await user.click(screen.getByRole("button", { name: /Songbook/ }));
     expect(window.location.hash).toBe("#/songbook");
+  });
+
+  it("shows the clear demo control when demo entries exist and clears them", async () => {
+    // Present at first, then gone after clearing.
+    vi.mocked(hasDemoEntries)
+      .mockReset()
+      .mockResolvedValueOnce(true)
+      .mockResolvedValue(false);
+    vi.mocked(clearDemoEntries).mockReset().mockResolvedValue(3);
+    const user = userEvent.setup();
+    render(<SettingsScreen />);
+
+    const clear = await screen.findByRole("button", { name: strings.demo.clear });
+    await user.click(clear);
+
+    expect(await screen.findByText(strings.demo.cleared)).toBeInTheDocument();
+    expect(clearDemoEntries).toHaveBeenCalledTimes(1);
+    // Storage refreshes after clearing (mount call plus the post-clear refresh).
+    expect(getStorageEstimate).toHaveBeenCalledTimes(2);
+    // The control is gone once no demo entries remain.
+    expect(
+      screen.queryByRole("button", { name: strings.demo.clear }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the clear demo control when there are no demo entries", async () => {
+    vi.mocked(hasDemoEntries).mockReset().mockResolvedValue(false);
+    render(<SettingsScreen />);
+    await screen.findByText("12 MB used");
+    expect(
+      screen.queryByRole("button", { name: strings.demo.clear }),
+    ).not.toBeInTheDocument();
   });
 });

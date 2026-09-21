@@ -19,6 +19,8 @@ import { navigate } from "../router/useHashRoute";
 import RecordButton from "./RecordButton";
 import EntryRow from "./EntryRow";
 import StatusMessage from "./StatusMessage";
+import Walkthrough from "./Walkthrough";
+import { useOnboarding } from "../onboarding/OnboardingContext";
 
 // The signature screen: hum a fragment of an old idea and Hum Vault returns the
 // closest saved ideas ranked by melody. It runs the exact capture pipeline
@@ -48,6 +50,7 @@ export default function SearchScreen() {
   const [modelReady, setModelReady] = useState(false);
   const [results, setResults] = useState<Entry[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const { markSearched } = useOnboarding();
 
   const candidatesRef = useRef<SearchCandidate[] | null>(null);
   const recordingRef = useRef<Recording | null>(null);
@@ -92,6 +95,12 @@ export default function SearchScreen() {
       getSharedPlayer().stop();
     };
   }, [loadCorpus]);
+
+  // A search that returns results is the third guided step. This advances the
+  // guide whether the query came from a recording or the example.
+  useEffect(() => {
+    if (phase === "results") markSearched();
+  }, [phase, markSearched]);
 
   const stopTimer = useCallback(() => {
     if (timerRef.current) {
@@ -257,6 +266,8 @@ export default function SearchScreen() {
       </header>
 
       <div className="screen__body">
+        <Walkthrough />
+
         {phase === "loading" && <Progress label={strings.progress.warming} />}
 
         {phase === "empty-corpus" && (

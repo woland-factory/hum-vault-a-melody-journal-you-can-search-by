@@ -13,6 +13,10 @@ services:
       SENTRY_DSN: "${SENTRY_DSN:-}"
       UMAMI_WEBSITE_ID: "${UMAMI_WEBSITE_ID:-}"
       UMAMI_URL: "${UMAMI_URL:-}"
+      # Seed a small sample songbook on first boot so a visitor can hear
+      # playback and run a hum-search without a microphone. On for staging,
+      # blank for production.
+      SEED_DEMO: "${SEED_DEMO:-1}"
     networks:
       - default
       - staging

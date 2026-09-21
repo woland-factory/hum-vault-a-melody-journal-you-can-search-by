@@ -114,6 +114,22 @@ describe("SongbookScreen", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("marks a demo entry as a sample and leaves real entries unmarked", async () => {
+    vi.mocked(listEntries).mockResolvedValue({
+      entries: [
+        entry({ id: "d", title: "Sample idea", isDemo: true }),
+        entry({ id: "r", title: "Real idea" }),
+      ],
+      nextBefore: null,
+    });
+    render(<SongbookScreen />);
+
+    const demoRow = (await screen.findByText("Sample idea")).closest("li")!;
+    expect(within(demoRow).getByText(strings.demo.badge)).toBeInTheDocument();
+    const realRow = screen.getByText("Real idea").closest("li")!;
+    expect(within(realRow).queryByText(strings.demo.badge)).not.toBeInTheDocument();
+  });
+
   it("shows a load error state with a reload action when the query rejects", async () => {
     vi.mocked(listEntries).mockRejectedValue(new Error("boom"));
     render(<SongbookScreen />);
