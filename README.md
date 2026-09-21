@@ -55,6 +55,15 @@ The search runs entirely in the browser over your own saved ideas. There is no
 server and no music catalog: it only ever finds tunes you have saved, and the
 query hum is matched in memory and never saved.
 
+### Try the demo
+
+To show off search without a microphone, set `SEED_DEMO=1`. On first load the
+app plants a small sample songbook of hummed ideas. Each one plays back a real
+melody, and one matches the bundled example, so tapping **Try an example** on
+the search screen returns it as the top result. The samples are marked with a
+**Sample** tag, and you can remove them anytime from **Settings**. The flag is
+off by default, so a normal install starts with an empty vault.
+
 ### Add from files (bulk import)
 
 Old voice memos can fill the vault in one go. On the capture screen, drop
