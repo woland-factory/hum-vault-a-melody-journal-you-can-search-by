@@ -36,6 +36,7 @@ export default function EntryRow({ entry, playing, onPlay, onOpen }: EntryRowPro
       <button
         type="button"
         className={`btn btn--secondary entry-row__play${playing ? " btn--active" : ""}`}
+        aria-pressed={playing}
         onClick={(e) => {
           e.stopPropagation();
           onPlay();

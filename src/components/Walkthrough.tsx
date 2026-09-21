@@ -19,7 +19,13 @@ export default function Walkthrough() {
   const progress = fill(strings.onboarding.progress, { n: step });
 
   return (
-    <div className="walkthrough" data-testid="walkthrough" role="note" aria-label={progress}>
+    <div
+      className="walkthrough"
+      data-testid="walkthrough"
+      role="note"
+      aria-live="polite"
+      aria-label={progress}
+    >
       <div className="walkthrough__text">
         <span className="walkthrough__progress">{progress}</span>
         <span className="walkthrough__label">{STEP_LABEL[step]}</span>

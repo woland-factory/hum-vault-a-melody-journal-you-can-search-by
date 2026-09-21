@@ -173,8 +173,9 @@ export default function SongbookScreen() {
                 className="btn btn--ghost songbook__more"
                 onClick={() => void handleShowMore()}
                 disabled={loadingMore}
+                aria-busy={loadingMore}
               >
-                {strings.nav.showMore}
+                {loadingMore ? strings.nav.showingMore : strings.nav.showMore}
               </button>
             )}
           </>

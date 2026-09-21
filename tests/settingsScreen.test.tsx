@@ -81,6 +81,37 @@ describe("SettingsScreen", () => {
     expect(downloadVaultZip).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a synchronous pending label and disables Export on tap (AC2.1)", async () => {
+    const user = userEvent.setup();
+    // The build never settles, so the pending label we see is the synchronous one.
+    vi.mocked(buildVaultZip).mockReturnValue(new Promise(() => {}) as never);
+    render(<SettingsScreen />);
+
+    await user.click(screen.getByRole("button", { name: strings.settings.export }));
+    const pending = screen.getByRole("button", { name: strings.settings.exporting });
+    expect(pending).toBeDisabled();
+  });
+
+  it("shows a synchronous pending label on Import when a file is chosen (AC2.1)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(importVaultZip).mockReturnValue(new Promise(() => {}) as never);
+    render(<SettingsScreen />);
+
+    await user.upload(screen.getByTestId("import-backup"), backupFile());
+    expect(screen.getByText(strings.settings.importing)).toBeInTheDocument();
+  });
+
+  it("announces an export failure assertively via role=alert (AC5.2)", async () => {
+    vi.mocked(buildVaultZip).mockRejectedValueOnce(new Error("boom"));
+    const user = userEvent.setup();
+    render(<SettingsScreen />);
+
+    await user.click(screen.getByRole("button", { name: strings.settings.export }));
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(strings.settings.exportError.title);
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument();
+  });
+
   it("shows a designed export error with retry when the build fails", async () => {
     vi.mocked(buildVaultZip)
       .mockRejectedValueOnce(new Error("boom"))

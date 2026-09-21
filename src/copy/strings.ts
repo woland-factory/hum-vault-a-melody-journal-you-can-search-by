@@ -60,6 +60,7 @@ export const strings = {
     songbook: "Songbook",
     recordFromSongbook: "Record a hum",
     showMore: "Show more",
+    showingMore: "Loading more",
     play: "Play",
     settings: "Settings",
   },
@@ -183,6 +184,7 @@ export const strings = {
   },
 
   detail: {
+    heading: "Your idea",
     titleLabel: "Title",
     tagsLabel: "Tags",
     addTagPlaceholder: "Add a tag",

@@ -5,15 +5,18 @@ interface TagEditorProps {
   tags: string[];
   onAdd: (tag: string) => void;
   onRemove: (tag: string) => void;
+  // True while a tag change is being persisted, so Add disables in place.
+  busy?: boolean;
 }
 
 // Tag chips with an accessible remove control, plus an input and Add action.
 // Validation (trim, length, count, duplicates) is enforced in the persistence
 // layer; this surface keeps the interaction simple.
-export default function TagEditor({ tags, onAdd, onRemove }: TagEditorProps) {
+export default function TagEditor({ tags, onAdd, onRemove, busy = false }: TagEditorProps) {
   const [draft, setDraft] = useState("");
 
   const submit = () => {
+    if (busy) return;
     const tag = draft.trim();
     if (tag.length === 0) return;
     onAdd(tag);
@@ -21,7 +24,7 @@ export default function TagEditor({ tags, onAdd, onRemove }: TagEditorProps) {
   };
 
   return (
-    <div className="tag-editor">
+    <div className="tag-editor" role="group" aria-labelledby="tags-label">
       <span className="field__label" id="tags-label">
         {strings.detail.tagsLabel}
       </span>
@@ -57,7 +60,12 @@ export default function TagEditor({ tags, onAdd, onRemove }: TagEditorProps) {
             }
           }}
         />
-        <button type="button" className="btn btn--secondary" onClick={submit}>
+        <button
+          type="button"
+          className="btn btn--secondary"
+          onClick={submit}
+          disabled={busy}
+        >
           {strings.detail.addTagAction}
         </button>
       </div>

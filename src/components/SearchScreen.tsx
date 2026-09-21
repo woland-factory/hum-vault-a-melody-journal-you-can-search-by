@@ -252,6 +252,23 @@ export default function SearchScreen() {
   }, []);
 
   const isRecording = phase === "recording";
+  const isPrompt =
+    phase === "idle" || phase === "requesting-mic" || phase === "recording";
+
+  // One persistent <h1> for the whole screen, so every phase has exactly one
+  // top-level heading. It is visible and styled as the title in the prompt and
+  // results phases, and visually hidden (but present) in the loading, empty,
+  // transcribing, no-match, no-notes, mic, and error phases where only a
+  // Progress or StatusMessage shows. Keeping it a single node avoids swapping
+  // heading elements as the phase changes.
+  const headingText =
+    phase === "results" ? strings.search.resultsHeading : strings.search.heading;
+  const headingClass =
+    phase === "results"
+      ? "screen__title search__results-heading"
+      : isPrompt
+        ? "screen__title"
+        : "visually-hidden";
 
   return (
     <main className="screen">
@@ -268,6 +285,8 @@ export default function SearchScreen() {
       <div className="screen__body">
         <Walkthrough />
 
+        <h1 className={headingClass}>{headingText}</h1>
+
         {phase === "loading" && <Progress label={strings.progress.warming} />}
 
         {phase === "empty-corpus" && (
@@ -283,7 +302,6 @@ export default function SearchScreen() {
           phase === "requesting-mic" ||
           phase === "recording") && (
           <div className="search__prompt">
-            <h1 className="screen__title">{strings.search.heading}</h1>
             <p className="screen__tagline">{strings.search.intro}</p>
             <RecordButton
               recording={isRecording}
@@ -312,9 +330,6 @@ export default function SearchScreen() {
 
         {phase === "results" && (
           <>
-            <h1 className="screen__title search__results-heading">
-              {strings.search.resultsHeading}
-            </h1>
             <ul className="entry-list">
               {results.map((entry) => (
                 <EntryRow

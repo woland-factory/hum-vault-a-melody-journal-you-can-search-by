@@ -46,9 +46,20 @@ vi.mock("../src/audio/recorder", () => {
   };
 });
 
+vi.mock("../src/db/entries", () => ({
+  saveEntry: vi.fn().mockResolvedValue({}),
+  countEntries: vi.fn().mockResolvedValue(0),
+}));
+
 import CaptureScreen from "../src/components/CaptureScreen";
 import { startRecording, RecorderError } from "../src/audio/recorder";
 import { transcribe } from "../src/transcribe/basicPitch";
+import { saveEntry, countEntries } from "../src/db/entries";
+
+const NOTES = [
+  { pitchMidi: 60, startSec: 0, durationSec: 0.5 },
+  { pitchMidi: 64, startSec: 0.5, durationSec: 0.5 },
+];
 
 function fakeRecording() {
   return {
@@ -62,6 +73,8 @@ beforeEach(() => {
   vi.mocked(startRecording).mockResolvedValue(fakeRecording() as never);
   vi.mocked(transcribe).mockReset();
   vi.mocked(transcribe).mockResolvedValue([]);
+  vi.mocked(saveEntry).mockReset().mockResolvedValue({} as never);
+  vi.mocked(countEntries).mockReset().mockResolvedValue(0);
 });
 
 async function recordThenStop(user: ReturnType<typeof userEvent.setup>) {
@@ -134,5 +147,58 @@ describe("CaptureScreen", () => {
     expect(
       screen.getByRole("button", { name: strings.emptyResult.action }),
     ).toBeInTheDocument();
+  });
+
+  it("gives the Record button an aria-pressed state that flips while recording (AC5.5)", async () => {
+    const user = userEvent.setup();
+    render(<CaptureScreen />);
+    const idle = screen.getByRole("button", { name: /Record a hum/ });
+    expect(idle).toHaveAttribute("aria-pressed", "false");
+
+    await user.click(idle);
+    const stop = await screen.findByRole("button", { name: strings.record.recording });
+    expect(stop).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows a synchronous pending cue on Record before the mic resolves (AC2.1)", async () => {
+    const user = userEvent.setup();
+    // getUserMedia is in flight: the button must give feedback before it settles.
+    vi.mocked(startRecording).mockReturnValueOnce(new Promise(() => {}) as never);
+    render(<CaptureScreen />);
+    await user.click(screen.getByRole("button", { name: /Record a hum/ }));
+    expect(screen.getByRole("button", { name: /Record a hum/ })).toBeDisabled();
+  });
+
+  it("disables and shows Saving synchronously when Save is tapped (AC2.1)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(transcribe).mockResolvedValueOnce(NOTES);
+    // The write never settles, so any Saving cue we see is the synchronous one.
+    vi.mocked(saveEntry).mockReturnValueOnce(new Promise(() => {}) as never);
+    render(<CaptureScreen />);
+    await recordThenStop(user);
+
+    await user.click(await screen.findByRole("button", { name: strings.save.action }));
+    const saving = screen.getByRole("button", { name: strings.save.saving });
+    expect(saving).toBeDisabled();
+  });
+
+  it("announces a save failure assertively and a success politely (AC5.2)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(transcribe).mockResolvedValue(NOTES);
+    vi.mocked(saveEntry).mockRejectedValueOnce(new Error("boom"));
+    render(<CaptureScreen />);
+    await recordThenStop(user);
+    await user.click(await screen.findByRole("button", { name: strings.save.action }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(strings.saveError.title);
+    // The visible copy is the designed string, never the thrown error text.
+    expect(screen.queryByText(/boom/)).not.toBeInTheDocument();
+
+    // A successful save reports politely, not assertively.
+    vi.mocked(saveEntry).mockResolvedValueOnce({} as never);
+    await user.click(screen.getByRole("button", { name: strings.saveError.action }));
+    const done = await screen.findByText(strings.save.saved);
+    expect(done).toHaveAttribute("role", "status");
   });
 });

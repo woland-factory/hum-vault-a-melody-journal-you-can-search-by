@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface ConfirmDialogProps {
   title: string;
@@ -21,6 +21,7 @@ export default function ConfirmDialog({
 }: ConfirmDialogProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
   const cancelRef = useRef<HTMLButtonElement>(null);
+  const [busy, setBusy] = useState(false);
   const titleId = "confirm-dialog-title";
   const bodyId = "confirm-dialog-body";
 
@@ -84,6 +85,7 @@ export default function ConfirmDialog({
             className="btn btn--ghost"
             ref={cancelRef}
             onClick={onCancel}
+            disabled={busy}
           >
             {cancelLabel}
           </button>
@@ -91,7 +93,14 @@ export default function ConfirmDialog({
             type="button"
             className="btn btn--danger"
             ref={confirmRef}
-            onClick={onConfirm}
+            // Disable in place the moment confirm is tapped so the destructive
+            // action gives immediate feedback and cannot fire twice.
+            onClick={() => {
+              setBusy(true);
+              onConfirm();
+            }}
+            disabled={busy}
+            aria-busy={busy}
           >
             {confirmLabel}
           </button>

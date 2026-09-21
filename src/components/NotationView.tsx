@@ -45,6 +45,7 @@ export default function NotationView({
           className={`btn ${playPrimary ? "btn--primary" : "btn--secondary"}${
             playing ? " btn--active" : ""
           }`}
+          aria-pressed={playing}
           onClick={onPlay}
         >
           {playing ? strings.ready.playing : strings.ready.play}

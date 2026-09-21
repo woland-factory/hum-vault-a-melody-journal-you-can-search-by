@@ -17,6 +17,7 @@ export default function EntryDetailScreen({ id }: { id: string }) {
   const [entry, setEntry] = useState<Entry | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
   const [saveError, setSaveError] = useState(false);
+  const [pending, setPending] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [playbackError, setPlaybackError] = useState(false);
   const [editingNotation, setEditingNotation] = useState(false);
@@ -67,6 +68,7 @@ export default function EntryDetailScreen({ id }: { id: string }) {
       const prev = entry;
       setEntry(optimistic);
       setSaveError(false);
+      setPending(true);
       try {
         const updated = await updateEntry(id, patch);
         setEntry(updated);
@@ -79,6 +81,8 @@ export default function EntryDetailScreen({ id }: { id: string }) {
         }
         setSaveError(true);
         return null;
+      } finally {
+        setPending(false);
       }
     },
     [entry, id],
@@ -250,8 +254,9 @@ export default function EntryDetailScreen({ id }: { id: string }) {
                 type="button"
                 className="btn btn--primary"
                 onClick={() => void handleSaveNotation()}
+                disabled={pending}
               >
-                {strings.detail.saveNotation}
+                {pending ? strings.save.saving : strings.detail.saveNotation}
               </button>
             </div>
           ) : (
@@ -268,7 +273,12 @@ export default function EntryDetailScreen({ id }: { id: string }) {
           )}
         </section>
 
-        <TagEditor tags={entry.tags} onAdd={handleAddTag} onRemove={handleRemoveTag} />
+        <TagEditor
+          tags={entry.tags}
+          onAdd={handleAddTag}
+          onRemove={handleRemoveTag}
+          busy={pending}
+        />
 
         {saveError && (
           <StatusMessage
@@ -314,6 +324,10 @@ function DetailShell({ children }: { children: React.ReactNode }) {
         >
           {strings.nav.songbook}
         </button>
+        {/* One programmatic top-level heading for the screen. The visible title
+            is an editable field, so this stays visually hidden but present in
+            every phase (loading, found, not found, error). */}
+        <h1 className="visually-hidden">{strings.detail.heading}</h1>
       </header>
       <div className="screen__body">{children}</div>
     </main>

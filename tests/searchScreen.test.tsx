@@ -215,4 +215,54 @@ describe("SearchScreen", () => {
       expect(screen.getByText(strings.search.error.title)).toBeInTheDocument(),
     );
   });
+
+  it("keeps exactly one h1 in the empty-corpus phase (AC5.1)", async () => {
+    vi.mocked(listContours).mockResolvedValue([]);
+    render(<SearchScreen />);
+    await screen.findByText(strings.search.emptyCorpus.title);
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent(strings.search.heading);
+  });
+
+  it("keeps exactly one h1 in the error phase (AC5.1)", async () => {
+    vi.mocked(listContours).mockRejectedValue(new Error("db down"));
+    render(<SearchScreen />);
+    await screen.findByText(strings.search.error.title);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("uses the results heading as the single screen h1 (AC5.1)", async () => {
+    vi.mocked(listContours).mockResolvedValue([candidate()]);
+    vi.mocked(getEntry).mockResolvedValue(tuneEntry());
+    vi.mocked(transcribe).mockResolvedValue(
+      [62, 64, 65, 67].map((p, i) => ({ pitchMidi: p, startSec: i * 0.4, durationSec: 0.4 })),
+    );
+    const user = userEvent.setup();
+    render(<SearchScreen />);
+    await user.click(await screen.findByRole("button", { name: strings.record.tryExample }));
+
+    const h1s = await screen.findAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent(strings.search.resultsHeading);
+  });
+
+  it("swaps Play to its active, aria-pressed state synchronously (AC2.1, AC5.5)", async () => {
+    vi.mocked(listContours).mockResolvedValue([candidate()]);
+    vi.mocked(getEntry).mockResolvedValue(tuneEntry());
+    vi.mocked(transcribe).mockResolvedValue(
+      [62, 64, 65, 67].map((p, i) => ({ pitchMidi: p, startSec: i * 0.4, durationSec: 0.4 })),
+    );
+    play.mockReturnValue(new Promise(() => {})); // stays "playing"
+    const user = userEvent.setup();
+    render(<SearchScreen />);
+    await user.click(await screen.findByRole("button", { name: strings.record.tryExample }));
+
+    const row = (await screen.findByText("Rising idea")).closest("li")!;
+    const playBtn = within(row).getByRole("button", { name: strings.nav.play });
+    expect(playBtn).toHaveAttribute("aria-pressed", "false");
+    await user.click(playBtn);
+    const playing = within(row).getByRole("button", { name: strings.ready.playing });
+    expect(playing).toHaveAttribute("aria-pressed", "true");
+  });
 });

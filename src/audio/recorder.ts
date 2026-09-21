@@ -22,6 +22,29 @@ export interface Recording {
   cancel(): void;
 }
 
+// Ask the browser for a container it actually records. Safari records
+// audio/mp4 (not webm), Chromium records audio/webm, so try the Safari type
+// first and fall back. When nothing reports supported (or the API is absent) we
+// return undefined and let the browser pick its own default. The recorded blob
+// is always tagged with the real recorder.mimeType, so an mp4 recording is
+// labeled mp4 and decodes correctly later.
+const PREFERRED_MIME_TYPES = ["audio/mp4", "audio/webm"];
+
+function pickMimeType(): string | undefined {
+  const supports =
+    typeof MediaRecorder !== "undefined" &&
+    typeof MediaRecorder.isTypeSupported === "function";
+  if (!supports) return undefined;
+  for (const type of PREFERRED_MIME_TYPES) {
+    try {
+      if (MediaRecorder.isTypeSupported(type)) return type;
+    } catch {
+      // Some engines throw on odd input; treat it as unsupported.
+    }
+  }
+  return undefined;
+}
+
 function classifyGetUserMediaError(err: unknown): RecorderErrorKind {
   const name = (err as { name?: string })?.name ?? "";
   if (name === "NotAllowedError" || name === "SecurityError") return "mic-denied";
@@ -58,7 +81,10 @@ export async function startRecording(options: {
   }
 
   const chunks: BlobPart[] = [];
-  const recorder = new MediaRecorder(stream);
+  const mimeType = pickMimeType();
+  const recorder = mimeType
+    ? new MediaRecorder(stream, { mimeType })
+    : new MediaRecorder(stream);
   recorder.ondataavailable = (event) => {
     if (event.data && event.data.size > 0) chunks.push(event.data);
   };

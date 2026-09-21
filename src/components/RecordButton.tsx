@@ -29,6 +29,7 @@ export default function RecordButton({
         className={`btn btn--primary record__btn${recording ? " record__btn--recording" : ""}`}
         onClick={recording ? onStop : onStart}
         disabled={disabled}
+        aria-pressed={recording}
         aria-label={recording ? strings.record.recording : strings.record.idle}
       >
         <span className="record__dot" aria-hidden="true" />

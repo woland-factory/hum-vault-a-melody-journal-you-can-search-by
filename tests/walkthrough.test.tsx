@@ -71,6 +71,13 @@ describe("guided first run", () => {
     expect(await getMeta<boolean>(FIRST_RUN_COMPLETE)).toBe(true);
   });
 
+  it("announces step changes through a live region (AC5.5)", async () => {
+    render(<Harness />);
+    const chip = await screen.findByTestId("walkthrough");
+    // A polite live region so a screen reader reads each step as it changes.
+    expect(chip).toHaveAttribute("aria-live", "polite");
+  });
+
   it("skips at any step and records completion", async () => {
     const user = userEvent.setup();
     render(<Harness />);

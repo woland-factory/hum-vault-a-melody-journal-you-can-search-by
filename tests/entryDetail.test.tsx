@@ -150,4 +150,56 @@ describe("EntryDetailScreen", () => {
     expect(await screen.findByText(strings.entryNotFound.title)).toBeInTheDocument();
     expect(screen.getByText(strings.entryNotFound.body)).toBeInTheDocument();
   });
+
+  it("labels the tag editor as a semantic group (AC5.5)", async () => {
+    vi.mocked(getEntry).mockResolvedValue(entry());
+    render(<EntryDetailScreen id="e1" />);
+    await screen.findByLabelText(strings.detail.titleLabel);
+    const group = screen.getByRole("group", { name: strings.detail.tagsLabel });
+    expect(group).toBeInTheDocument();
+  });
+
+  it("exposes exactly one screen-level h1 (AC5.1)", async () => {
+    vi.mocked(getEntry).mockResolvedValue(entry());
+    render(<EntryDetailScreen id="e1" />);
+    await screen.findByLabelText(strings.detail.titleLabel);
+    const h1s = screen.getAllByRole("heading", { level: 1 });
+    expect(h1s).toHaveLength(1);
+    expect(h1s[0]).toHaveTextContent(strings.detail.heading);
+  });
+
+  it("keeps one h1 even in the not-found phase (AC5.1)", async () => {
+    vi.mocked(getEntry).mockResolvedValue(undefined);
+    render(<EntryDetailScreen id="missing" />);
+    await screen.findByText(strings.entryNotFound.title);
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+  });
+
+  it("disables Save notation while the write is pending (AC2.1)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getEntry).mockResolvedValue(entry());
+    vi.mocked(updateEntry).mockReturnValue(new Promise(() => {}) as never);
+    render(<EntryDetailScreen id="e1" />);
+
+    await user.click(await screen.findByRole("button", { name: strings.detail.editNotation }));
+    const textarea = screen.getByLabelText(strings.detail.notationLabel);
+    await user.clear(textarea);
+    await user.type(textarea, "X:1\nK:G\nGAB\n");
+    await user.click(screen.getByRole("button", { name: strings.detail.saveNotation }));
+
+    expect(screen.getByRole("button", { name: strings.save.saving })).toBeDisabled();
+  });
+
+  it("disables Add tag while the write is pending (AC2.1)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getEntry).mockResolvedValue(entry({ tags: [] }));
+    vi.mocked(updateEntry).mockReturnValue(new Promise(() => {}) as never);
+    render(<EntryDetailScreen id="e1" />);
+
+    const tagInput = await screen.findByLabelText(strings.detail.addTagPlaceholder);
+    await user.type(tagInput, "jazz");
+    await user.click(screen.getByRole("button", { name: strings.detail.addTagAction }));
+
+    expect(screen.getByRole("button", { name: strings.detail.addTagAction })).toBeDisabled();
+  });
 });

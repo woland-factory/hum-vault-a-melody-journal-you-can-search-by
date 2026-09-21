@@ -140,6 +140,41 @@ describe("SongbookScreen", () => {
     ).toBeInTheDocument();
   });
 
+  it("gives the Play control an aria-pressed state (AC5.5)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listEntries).mockResolvedValue({
+      entries: [entry({ id: "a", title: "Tune" })],
+      nextBefore: null,
+    });
+    render(<SongbookScreen />);
+    const row = (await screen.findByText("Tune")).closest("li")!;
+    const playBtn = within(row).getByRole("button", { name: strings.nav.play });
+    expect(playBtn).toHaveAttribute("aria-pressed", "false");
+    await user.click(playBtn);
+    expect(
+      within(row).getByRole("button", { name: strings.ready.playing }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("shows a synchronous pending label on Show more while the next page loads (AC2.1)", async () => {
+    const user = userEvent.setup();
+    vi.mocked(listEntries)
+      .mockResolvedValueOnce({
+        entries: [entry({ id: "a", title: "First" })],
+        nextBefore: 1000,
+      })
+      // The next page never settles, so the pending label we see is synchronous.
+      .mockReturnValueOnce(new Promise(() => {}) as never);
+    render(<SongbookScreen />);
+
+    await screen.findByText("First");
+    await user.click(screen.getByRole("button", { name: strings.nav.showMore }));
+
+    const pending = screen.getByRole("button", { name: strings.nav.showingMore });
+    expect(pending).toBeDisabled();
+    expect(pending).toHaveAttribute("aria-busy", "true");
+  });
+
   it("appends the next page when Show more is tapped and the query stays bounded", async () => {
     const user = userEvent.setup();
     vi.mocked(listEntries)

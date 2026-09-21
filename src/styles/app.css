@@ -773,7 +773,7 @@ body {
 .songbook__settings {
   align-self: flex-start;
   padding: 4px 4px;
-  min-height: 32px;
+  min-height: 44px;
   font-weight: 500;
   color: var(--muted);
 }
