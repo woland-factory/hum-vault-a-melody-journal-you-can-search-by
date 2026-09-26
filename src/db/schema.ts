@@ -41,7 +41,7 @@ export interface SearchCandidate {
 }
 
 export interface Entry {
-  id: string; // crypto.randomUUID()
+  id: string; // random UUID v4 from src/util/id.ts (works in insecure contexts)
   title: string;
   createdAt: number; // epoch ms; the newest-first sort key
   updatedAt: number; // epoch ms

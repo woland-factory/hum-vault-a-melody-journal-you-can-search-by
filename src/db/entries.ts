@@ -1,5 +1,6 @@
 import type { NoteEvent } from "../transcribe/types";
 import { computeContour } from "../melody/contour";
+import { newId } from "../util/id";
 import {
   CREATED_AT_INDEX,
   DB_NAME,
@@ -158,7 +159,7 @@ export function saveEntry(input: {
     // computeContour runs here so "contour is derived from notes" is enforced
     // in one place and cannot drift from what callers pass.
     entry = {
-      id: crypto.randomUUID(),
+      id: newId(),
       title,
       createdAt: now,
       updatedAt: now,
