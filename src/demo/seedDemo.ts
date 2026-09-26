@@ -12,6 +12,10 @@ import { DEMO_CLIPS } from "./demoData";
 // the exact capture pipeline the "Try an example" button runs, so there is no
 // demo-only search path. Everything happens on the device.
 
+// Fired once the seed pass settles, so a screen mounted before the seed
+// finished can refresh anything it read from an empty database.
+export const SEED_COMPLETE_EVENT = "hum-vault:seed-complete";
+
 /**
  * Seed the sample songbook once, if SEED_DEMO is on and it has not run before.
  * A no-op otherwise. Fire-and-forget: called after first paint, never awaited

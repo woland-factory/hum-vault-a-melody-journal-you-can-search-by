@@ -55,6 +55,7 @@ import CaptureScreen from "../src/components/CaptureScreen";
 import { startRecording, RecorderError } from "../src/audio/recorder";
 import { transcribe } from "../src/transcribe/basicPitch";
 import { saveEntry, countEntries } from "../src/db/entries";
+import { SEED_COMPLETE_EVENT } from "../src/demo/seedDemo";
 
 const NOTES = [
   { pitchMidi: 60, startSec: 0, durationSec: 0.5 },
@@ -180,6 +181,27 @@ describe("CaptureScreen", () => {
     await user.click(await screen.findByRole("button", { name: strings.save.action }));
     const saving = screen.getByRole("button", { name: strings.save.saving });
     expect(saving).toBeDisabled();
+  });
+
+  it("reveals the Songbook link after the demo seed settles, without a reload", async () => {
+    // Cold visitor: the count read at mount is empty, so no link is shown yet.
+    vi.mocked(countEntries).mockReset().mockResolvedValue(0);
+    render(<CaptureScreen />);
+    expect(
+      await screen.findByRole("button", { name: /Record a hum/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: new RegExp(strings.nav.songbook) }),
+    ).not.toBeInTheDocument();
+
+    // The seed finishes after mount and announces itself: the count refreshes.
+    vi.mocked(countEntries).mockResolvedValue(3);
+    window.dispatchEvent(new Event(SEED_COMPLETE_EVENT));
+
+    const link = await screen.findByRole("button", {
+      name: new RegExp(strings.nav.songbook),
+    });
+    expect(link).toHaveTextContent("3");
   });
 
   it("announces a save failure assertively and a success politely (AC5.2)", async () => {

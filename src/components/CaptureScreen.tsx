@@ -13,6 +13,7 @@ import { notesToAbc } from "../notation/notesToAbc";
 import { estimateMelodyMs } from "../melody/duration";
 import { getSharedPlayer, type VisualObj } from "../playback/player";
 import { saveEntry, countEntries } from "../db/entries";
+import { SEED_COMPLETE_EVENT } from "../demo/seedDemo";
 import { navigate } from "../router/useHashRoute";
 import RecordButton from "./RecordButton";
 import NotationView from "./NotationView";
@@ -101,6 +102,19 @@ export default function CaptureScreen() {
       active = false;
     };
   }, [phase, saveState]);
+
+  // The demo seed runs after first paint, so the count read at mount can miss
+  // the seeded ideas. Re-read once the seed settles so a cold visitor sees the
+  // Songbook link without reloading.
+  useEffect(() => {
+    function refresh() {
+      void countEntries()
+        .then((n) => setEntryCount(n))
+        .catch(() => {});
+    }
+    window.addEventListener(SEED_COMPLETE_EVENT, refresh);
+    return () => window.removeEventListener(SEED_COMPLETE_EVENT, refresh);
+  }, []);
 
   useEffect(() => {
     return () => {
